@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 // import axios from 'axios'; // (Descomentar para la API real)
 import AuthLayout from './Auth'; // La plantilla de estilo
+import { useForm } from "react-hook-form";
+import { ToastContainer } from 'react-toastify';
+import { useFetch } from '../hooks/useFetch';
 
 function Register() {
   const [formData, setFormData] = useState({
