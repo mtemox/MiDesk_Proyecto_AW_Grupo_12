@@ -50,7 +50,9 @@ function Taskbar() {
   // --- Clases dinámicas de Tailwind ---
 
   // Clases base (comunes para todas las posiciones)
-  const baseClasses = "fixed bg-gray-950 bg-opacity-70 backdrop-blur-md z-50 transition-all duration-300 ease-in-out text-white flex items-center";
+  // --- 1. CLASES BASE MODIFICADAS ---
+  // Añadimos 'shadow-lg shadow-black/50'
+  const baseClasses = "fixed bg-gray-950 bg-opacity-70 backdrop-blur-md z-50 transition-all duration-300 ease-in-out text-white flex items-center shadow-lg shadow-black/50";
 
   // Clases específicas para cada posición
   let positionClasses = '';
@@ -98,7 +100,8 @@ function Taskbar() {
       {/* Botón de IA (más corto) */}
       <div 
         className={`w-6 h-6 bg-blue-900 text-white flex items-center justify-center 
-                    rounded-md cursor-pointer hover:bg-blue-700 flex-shrink-0 ${buttonMargin}`}
+                    rounded-md cursor-pointer hover:bg-blue-700 flex-shrink-0 ${buttonMargin}
+                    transition-colors duration-200`}
       >
         IA
       </div>
@@ -111,7 +114,8 @@ function Taskbar() {
         {/* Botón para cambiar posición */}
         <button 
           onClick={handleChangePosition}
-          className="p-1 rounded-full text-gray-300 hover:text-white hover:bg-white/10"
+          className="p-1 rounded-full text-gray-300 hover:text-white hover:bg-white/10
+                     transition-colors duration-200"
           title="Cambiar posición de la barra"
         >
           <SettingsIcon />
