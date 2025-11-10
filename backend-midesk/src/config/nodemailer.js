@@ -24,7 +24,7 @@ const sendMail = async (to, subject, html) => {
 
     try {
         const info = await transporter.sendMail({
-            from: '"SMARTVET" <admin@vet.com>',
+            from: '"DeskVirtual" <admin@vet.com>',
             to,
             subject,
             html,
@@ -36,4 +36,6 @@ const sendMail = async (to, subject, html) => {
     }
 }
 
+
 export default sendMail
+
