@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 // import axios from 'axios'; // (Descomentar para la API real)
 import AuthLayout from './Auth'; // Reutilizamos el layout
+import { useFetch } from '../hooks/useFetch';
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -12,7 +13,8 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
+  const fetchDataBackend = useFetch();
+  
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError(''); // Limpiar error al escribir
@@ -23,58 +25,35 @@ function Login() {
     setError('');
     setLoading(true);
 
-    // --- SIMULACIÓN DE API (OMITIR ESTO CON BACKEND REAL) ---
-    // (Usa 'admin@esfot.com' y '123456' para entrar)
-
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    if (formData.email === 'admin@esfot.com' && formData.password === '123456') {
-      
-      // Tarea: Almacenar el token de sesión (JWT) en el cliente
-      localStorage.setItem('token', 'mock_jwt_token_12345');
-      
-      // Tarea: Redirigir al usuario al escritorio tras el éxito
-      navigate('/desktop');
-    } else {
-      setError('Credenciales incorrectas. Inténtalo de nuevo.');
-    }
-    setLoading(false);
-    // --- FIN DE SIMULACIÓN ---
-
-
-    /*
-    // --- CÓDIGO REAL CON AXIOS (TAREA: SB-F-002) ---
-    // (Comentado hasta que el backend esté listo)
-
     try {
-      // Tarea: Implementar envío de credenciales al backend
-      const response = await axios.post('URL_DEL_BACKEND/api/auth/login', formData);
+      // Llamada al backend real
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const response = await fetchDataBackend(
+        `${backendUrl}/login`,
+        formData,
+        "POST"
+      );
       
-      // Tarea: Almacenar el token de sesión (JWT) en el cliente
-      const token = response.data.token;
-      localStorage.setItem('token', token);
-      
-      // Tarea: Redirigir al usuario al escritorio tras el éxito
-      navigate('/desktop');
-
-    } catch (error) {
-      if (error.response && error.response.status === 401) {
-        setError('Credenciales incorrectas. Inténtalo de nuevo.');
-      } else {
-        setError('Ocurrió un error inesperado. Inténtalo de nuevo.');
+      if (response?.token) {
+        // Guardar token y redirigir
+        localStorage.setItem('token', response.token);
+        navigate('/desktop');
       }
+    } catch (error) {
+      setError('Credenciales incorrectas. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
-    */
+
   };
 
   return (
     <AuthLayout title="Iniciar Sesión">
-      {/* Tarea: Diseñar el componente UI del formulario de login */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-purple-200">Correo Electrónico</label>
+          <label htmlFor="email" className="block text-sm font-medium text-purple-200">
+            Correo Electrónico
+          </label>
           <input
             id="email"
             name="email"
@@ -87,7 +66,9 @@ function Login() {
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-purple-200">Contraseña</label>
+          <label htmlFor="password" className="block text-sm font-medium text-purple-200">
+            Contraseña
+          </label>
           <input
             id="password"
             name="password"
@@ -100,7 +81,6 @@ function Login() {
           />
         </div>
 
-        {/* Mensaje de Error */}
         {error && <p className="text-sm text-center text-red-400">{error}</p>}
 
         <div>
@@ -114,7 +94,7 @@ function Login() {
         </div>
       </form>
       <p className="text-sm text-center text-gray-400">
-        ¿No tienes una cuenta? {' '}
+        ¿No tienes una cuenta?{' '}
         <Link to="/register" className="font-medium text-purple-400 hover:text-purple-300">
           Regístrate
         </Link>

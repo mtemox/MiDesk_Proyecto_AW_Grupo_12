@@ -7,18 +7,23 @@ import { useForm } from "react-hook-form";
 import { ToastContainer } from 'react-toastify';
 import { useFetch } from '../hooks/useFetch';
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000/api';
+
 function Register() {
   const [formData, setFormData] = useState({
-    name: '',
+    nombre: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
   const [errors, setErrors] = useState({});
-  const [apiError, setApiError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  // const [apiError, setApiError] = useState('');
+  // const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // (TAREA: Instanciamos el hook)
+  const fetchDataBackend = useFetch();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -26,7 +31,7 @@ function Register() {
     if (errors[e.target.name]) {
       setErrors({ ...errors, [e.target.name]: null });
     }
-    setApiError('');
+    // setApiError('');
   };
 
   // Tarea: Implementar validación de campos en el cliente
@@ -49,63 +54,32 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError('');
-    setSuccessMessage('');
 
-    if (!validateForm()) {
-      return; // Detener si hay errores de validación
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
 
-    // --- SIMULACIÓN DE API (OMITIR ESTO CON BACKEND REAL) ---
-    // (Usa 'error@dominio.com' para simular un error)
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    if (formData.email === 'error@dominio.com') {
-      // Tarea: Gestionar y mostrar mensajes de error
-      setApiError('Este correo electrónico ya está registrado.');
-      setLoading(false);
-      return;
-    }
-    
-    // Tarea: Gestionar y mostrar mensajes de éxito
-    setSuccessMessage('¡Registro exitoso! Redirigiendo al login...');
-    setTimeout(() => {
-      navigate('/login');
-    }, 2000);
-    // --- FIN DE SIMULACIÓN ---
-
-
-    /*
-    // --- CÓDIGO REAL CON AXIOS (TAREA: SB-F-001) ---
-    // (Comentado hasta que el backend esté listo)
-    
     try {
-      const { name, email, password } = formData;
-      // Tarea: Implementar envío de datos al 'endpoint' del backend
-      const response = await axios.post('URL_DEL_BACKEND/api/auth/register', {
-        name,
-        email,
-        password
-      });
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const { nombre, email, password } = formData;
       
-      setSuccessMessage('¡Registro exitoso! Redirigiendo al login...');
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      const response = await fetchDataBackend(
+        `${backendUrl}/registro`,
+        { nombre, email, password },
+        "POST"
+      );
 
-    } catch (error) {
-      if (error.response && error.response.data && error.response.data.message) {
-        setApiError(error.response.data.message);
-      } else {
-        setApiError('Ocurrió un error inesperado. Inténtalo de nuevo.');
+      if (response) {
+        // El useFetch ya muestra el toast de éxito
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       }
+    } catch (error) {
+      console.error('Error en registro:', error);
     } finally {
       setLoading(false);
     }
-    */
   };
 
   // Función de helper para inputs
@@ -127,6 +101,8 @@ function Register() {
 
   return (
     <AuthLayout title="Crear Cuenta">
+      <ToastContainer />
+      {/* Asegúrate de tener <ToastContainer /> en tu App.jsx para ver los mensajes */}
       {/* Tarea: Diseñar el componente UI del formulario de registro */}
       <form onSubmit={handleSubmit} className="space-y-4">
         
@@ -136,8 +112,8 @@ function Register() {
         {renderInput('confirmPassword', 'password', 'Confirmar Contraseña')}
 
         {/* Mensajes de Error/Éxito */}
-        {apiError && <p className="text-sm text-center text-red-400">{apiError}</p>}
-        {successMessage && <p className="text-sm text-center text-green-400">{successMessage}</p>}
+        {/* {apiError && <p className="text-sm text-center text-red-400">{apiError}</p>}
+        {successMessage && <p className="text-sm text-center text-green-400">{successMessage}</p>} */}
 
         <div>
           <button
