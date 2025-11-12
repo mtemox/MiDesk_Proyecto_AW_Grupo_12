@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import AppLayout from './layouts/AppLayout';
 import ProtectedRoute from './layouts/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
+import { Confirm } from './pages/Confirm';
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
       {/* Rutas de Autenticación */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      <Route path="/confirmar/:token" element={<Confirm />} />
 
       {/* Ruta principal de la App (Protegida) */}
       <Route 

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 // 1. IMPORTAMOS el ícono que preparaste
 // Sube dos niveles ('../../') para llegar a 'src/assets/'
-import iconImage from '../../assets/logos/esfot.png';
+import iconImage from '../../assets/logos/midesk.jpg';
 
 // --- ¡Importante! ---
 // Asegúrate de que la ruta de arriba ('../../assets/icons/icon-midesk-app.png')
