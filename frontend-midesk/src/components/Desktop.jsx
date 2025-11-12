@@ -19,6 +19,12 @@ import newsIcon from '../assets/icons/news.png';
 import WeatherWidget from './widgets/WeatherWidget';
 import NewsWidget from './widgets/NewsWidget';
 
+import WallpaperWidget from './widgets/WallpaperWidget';
+import wallpaperIcon from '../assets/icons/wallpaper.png'; // (Necesitarás un icono)
+
+import wordIcon from '../assets/icons/doc.png';
+import WordEditor from './WordEditor';
+
 // --- SIMULACIÓN DE DATOS DEL BACKEND ---
 // (En el futuro, esto vendrá de una API real)
 // Traemos las imágenes que ya tenías
@@ -83,6 +89,22 @@ const mockIconsData = [
     type: 'app',
     appId: 'news',
     windowOptions: { defaultWidth: 400, defaultHeight: 500 }
+  },
+  {
+  _id: '9', // Siguiente ID
+  nombre: 'Foto del Día',
+  imgSrc: wallpaperIcon,
+  type: 'app',
+  appId: 'wallpaper',
+  windowOptions: { defaultWidth: 500, defaultHeight: 350 }
+},
+{
+    _id: '10',
+    nombre: 'Procesador de Texto',
+    imgSrc: wordIcon, // El ícono que importaste
+    type: 'app',
+    appId: 'wordprocessor', // <-- El appId que querías
+    windowOptions: { defaultWidth: 700, defaultHeight: 500 } // Un buen tamaño para un editor
   }
 ];
 // --- FIN SIMULACIÓN ---
@@ -274,10 +296,20 @@ function Desktop() {
       
     case 'news':
       return <NewsWidget />;
+
+    case 'wallpaper':
+      return <WallpaperWidget />;
+
+    // case 'wordprocessor':
+    //     return <RichTextEditor />;
+
+  case 'wordprocessor':
+      return <WordEditor />;
       
     default:
       return <div className="text-white p-4">App no encontrada</div>;
     }
+
   };
 
   
