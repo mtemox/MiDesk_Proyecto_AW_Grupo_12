@@ -2,46 +2,31 @@ import nodemailer from "nodemailer"
 import dotenv from "dotenv"
 dotenv.config()
 
-// ✅ OPCIÓN 1: Si usas Gmail real
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.USER_MAILTRAP, // Tu email de Gmail
-        pass: process.env.PASS_MAILTRAP,  // Tu contraseña de aplicación de Gmail
+        user: process.env.USER_MAILTRAP,
+        pass: process.env.PASS_MAILTRAP,
     },
+    // ⚡ Agregar timeouts
+    connectionTimeout: 10000, // 10 segundos
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
 })
 
-// ✅ OPCIÓN 2: Si usas Mailtrap (para testing)
-// const transporter = nodemailer.createTransport({
-//     host: process.env.HOST_MAILTRAP,
-//     port: process.env.PORT_MAILTRAP,
-//     auth: {
-//         user: process.env.USER_MAILTRAP,
-//         pass: process.env.PASS_MAILTRAP,
-//     },
-// })
+// ✅ Verificar la conexión al iniciar
+transporter.verify((error, success) => {
+    if (error) {
+        console.error("❌ Error en configuración de email:", error);
+    } else {
+        console.log("✅ Servidor de email listo para enviar mensajes");
+    }
+});
 
-// ✅ OPCIÓN 3: Si usas otro servicio SMTP
-// const transporter = nodemailer.createTransport({
-//     host: "smtp.gmail.com", // o tu host SMTP
-//     port: 587,
-//     secure: false, // true para puerto 465, false para otros
-//     auth: {
-//         user: process.env.USER_MAILTRAP,
-//         pass: process.env.PASS_MAILTRAP,
-//     },
-// })
-
-/**
- * Función genérica para enviar correos
- * @param {string} to - Email del destinatario
- * @param {string} subject - Asunto del correo
- * @param {string} html - Contenido HTML del correo
- */
 const sendMail = async (to, subject, html) => {
     try {
         const info = await transporter.sendMail({
-            from: '"DeskVirtual" <admin@vet.com>', // ⚠️ Debe ser un email válido si usas Gmail
+            from: '"DeskVirtual" <materchico@gmail.com>',
             to,
             subject,
             html,

@@ -49,27 +49,35 @@ const login = async (req, res) => {
 // FIN DEL LOGIN
 
 const registro = async (req,res)=>{
-
     try {
-        //Paso 1
         const {email,password} = req.body
-        //Paso 2
-        if (Object.values(req.body).includes("")) return res.status(400).json({msg:"Lo sentimos, debes llenar todos los campos"})
+        
+        if (Object.values(req.body).includes("")) 
+            return res.status(400).json({msg:"Lo sentimos, debes llenar todos los campos"})
+        
         const verificarEmailBDD = await Estudiante.findOne({email})
-        if(verificarEmailBDD) return res.status(400).json({msg:"Lo sentimos, el email ya se encuentra registrado"})
-        //Paso 3 
+        if(verificarEmailBDD) 
+            return res.status(400).json({msg:"Lo sentimos, el email ya se encuentra registrado"})
+        
         const nuevoEstudiante = new Estudiante(req.body)
         nuevoEstudiante.password = await nuevoEstudiante.encryptPassword(password)
         const token = nuevoEstudiante.createToken()
-        await sendMailToRegister(email,token)
+        
+        // ⚡ Guardar primero en la BD
         await nuevoEstudiante.save()
-        //Paso 4
-        res.status(200).json({msg:"Revisa tu correo electrónico para confirmar tu cuenta"})
+        
+        // ✅ Enviar email de forma asíncrona (sin esperar)
+        sendMailToRegister(email,token).catch(err => 
+            console.error("Error al enviar email:", err)
+        )
+        
+        // ⚡ Responder inmediatamente
+        res.status(200).json({msg:"Registro exitoso. Revisa tu correo electrónico para confirmar tu cuenta"})
 
     } catch (error) {
-        res.status(500).json({ msg: `❌ Error en el servidor - ${error}` })
+        console.error(error)
+        res.status(500).json({ msg: `❌ Error en el servidor - ${error.message}` })
     }
-
 }
 
 const confirmarMail = async (req, res) => {
