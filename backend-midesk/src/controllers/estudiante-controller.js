@@ -1,5 +1,52 @@
 import Estudiante from "../models/estudiante.js"
 import { sendMailToRecoveryPassword, sendMailToRegister } from "../helpers/sendMail.js"
+import jwt from 'jsonwebtoken'
+
+// LOGIN
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        // 1. Validar campos
+        if (Object.values(req.body).includes("")) 
+            return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
+
+        // 2. Verificar que el usuario exista
+        const estudianteBDD = await Estudiante.findOne({ email });
+        if (!estudianteBDD) 
+            return res.status(404).json({ msg: "Lo sentimos, el usuario no se encuentra registrado" });
+
+        // 3. Verificar si la cuenta está confirmada
+        if (!estudianteBDD.confirmMail) 
+            return res.status(401).json({ msg: "Lo sentimos, debes confirmar tu cuenta" });
+
+        // 4. Verificar el password
+        const matchPassword = await estudianteBDD.matchPassword(password);
+        if (!matchPassword) 
+            return res.status(401).json({ msg: "Lo sentimos, el password no es correcto" });
+
+        // 5. Generar el Token JWT para la sesión
+        const token = jwt.sign(
+            { id: estudianteBDD._id, nombre: estudianteBDD.nombre },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' } // El token expira en 1 día
+        );
+
+        // 6. Enviar respuesta al frontend
+        res.status(200).json({
+            token,
+            id: estudianteBDD._id,
+            nombre: estudianteBDD.nombre,
+            email: estudianteBDD.email,
+            msg: "Inicio de sesión exitoso" // Mensaje para el toast del frontend
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: `❌ Error en el servidor - ${error.message}` });
+    }
+}
+// FIN DEL LOGIN
 
 const registro = async (req,res)=>{
 
@@ -101,6 +148,7 @@ const crearNuevoPassword = async (req,res)=>{
 
 
 export {
+    login,
     registro,
     confirmarMail,
     recuperarPassword,

@@ -10,58 +10,22 @@ import { useFetch } from '../hooks/useFetch';
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000/api';
 
 function Register() {
-  const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [errors, setErrors] = useState({});
-  // const [apiError, setApiError] = useState('');
-  // const [successMessage, setSuccessMessage] = useState('');
+
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  // (TAREA: Instanciamos el hook)
   const fetchDataBackend = useFetch();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    // Limpiar errores al escribir
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: null });
-    }
-    // setApiError('');
-  };
+  // --- CONFIGURACIÓN DE REACT-HOOK-FORM ---
+  const { register, handleSubmit, formState: { errors }, watch } = useForm();
 
-  // Tarea: Implementar validación de campos en el cliente
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name) newErrors.name = 'El nombre es requerido';
-    if (!formData.email) {
-      newErrors.email = 'El email es requerido';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'El formato de email no es válido';
-    }
-    if (!formData.password) newErrors.password = 'La contraseña es requerida';
-    else if (formData.password.length < 6) newErrors.password = 'Debe tener al menos 6 caracteres';
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Las contraseñas no coinciden';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // Usamos watch para poder comparar la contraseña de confirmación
+  const password = watch('password');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
+  const onSubmit = async (data) => {
     setLoading(true);
-
     try {
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
-      const { nombre, email, password } = formData;
+      const { nombre, email, password } = data; // 'data' viene de react-hook-form
       
       const response = await fetchDataBackend(
         `${backendUrl}/registro`,
@@ -70,51 +34,96 @@ function Register() {
       );
 
       if (response) {
-        // El useFetch ya muestra el toast de éxito
+        // El hook useFetch ya muestra el toast de éxito con el 'msg' del backend
         setTimeout(() => {
           navigate('/login');
-        }, 2000);
+        }, 2000); // Esperamos 2 seg antes de redirigir
       }
     } catch (error) {
       console.error('Error en registro:', error);
+      // El hook useFetch ya muestra el toast de error
     } finally {
       setLoading(false);
     }
   };
 
-  // Función de helper para inputs
-  const renderInput = (name, type, placeholder) => (
-    <div>
-      <label htmlFor={name} className="block text-sm font-medium text-purple-200">{placeholder}</label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={formData[name]}
-        onChange={handleChange}
-        className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-        placeholder={`Ingresa tu ${placeholder.toLowerCase()}`}
-      />
-      {errors[name] && <p className="mt-1 text-xs text-red-400">{errors[name]}</p>}
-    </div>
-  );
-
   return (
     <AuthLayout title="Crear Cuenta">
-      <ToastContainer />
-      {/* Asegúrate de tener <ToastContainer /> en tu App.jsx para ver los mensajes */}
-      {/* Tarea: Diseñar el componente UI del formulario de registro */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/* handleSubmit(onSubmit) activa la validación de hook-form antes de llamar a onSubmit */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         
-        {renderInput('name', 'text', 'Nombre Completo')}
-        {renderInput('email', 'email', 'Correo Electrónico')}
-        {renderInput('password', 'password', 'Contraseña')}
-        {renderInput('confirmPassword', 'password', 'Confirmar Contraseña')}
+        {/* --- CAMPO NOMBRE --- */}
+        <div>
+          <label htmlFor="nombre" className="block text-sm font-medium text-purple-200">Nombre Completo</label>
+          <input
+            id="nombre"
+            type="text"
+            {...register('nombre', { // 'register' registra el input
+              required: 'El nombre es requerido' // Regla de validación
+            })}
+            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="Ingresa tu nombre completo"
+          />
+          {/* Muestra el error si existe */}
+          {errors.nombre && <p className="mt-1 text-xs text-red-400">{errors.nombre.message}</p>}
+        </div>
 
-        {/* Mensajes de Error/Éxito */}
-        {/* {apiError && <p className="text-sm text-center text-red-400">{apiError}</p>}
-        {successMessage && <p className="text-sm text-center text-green-400">{successMessage}</p>} */}
+        {/* --- CAMPO EMAIL --- */}
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-purple-200">Correo Electrónico</label>
+          <input
+            id="email"
+            type="email"
+            {...register('email', { 
+              required: 'El email es requerido',
+              pattern: { // Validación con Expresión Regular
+                value: /\S+@\S+\.\S+/,
+                message: 'El formato de email no es válido'
+              }
+            })}
+            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="tu-correo@esfot.com"
+          />
+          {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
+        </div>
 
+        {/* --- CAMPO PASSWORD --- */}
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-purple-200">Contraseña</label>
+          <input
+            id="password"
+            type="password"
+            {...register('password', { 
+              required: 'La contraseña es requerida',
+              minLength: {
+                value: 6,
+                message: 'Debe tener al menos 6 caracteres'
+              }
+            })}
+            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="Mínimo 6 caracteres"
+          />
+          {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
+        </div>
+
+        {/* --- CAMPO CONFIRMAR PASSWORD --- */}
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-purple-200">Confirmar Contraseña</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            {...register('confirmPassword', { 
+              required: 'Debes confirmar la contraseña',
+              validate: value => // Validación personalizada
+                value === password || 'Las contraseñas no coinciden'
+            })}
+            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="Repite tu contraseña"
+          />
+          {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
+        </div>
+
+        {/* --- BOTÓN SUBMIT --- */}
         <div>
           <button
             type="submit"
@@ -125,6 +134,7 @@ function Register() {
           </button>
         </div>
       </form>
+
       <p className="text-sm text-center text-gray-400">
         ¿Ya tienes una cuenta? {' '}
         <Link to="/login" className="font-medium text-purple-400 hover:text-purple-300">

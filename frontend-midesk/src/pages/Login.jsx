@@ -4,85 +4,88 @@ import { Link, useNavigate } from 'react-router-dom';
 // import axios from 'axios'; // (Descomentar para la API real)
 import AuthLayout from './Auth'; // Reutilizamos el layout
 import { useFetch } from '../hooks/useFetch';
+import { useForm } from "react-hook-form";
 
 function Login() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const fetchDataBackend = useFetch();
   
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(''); // Limpiar error al escribir
-  };
+  const { register, handleSubmit, formState: { errors } } = useForm();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const onSubmit = async (data) => {
     setLoading(true);
 
     try {
-      // Llamada al backend real
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      
+      // 'data' ya contiene { email, password }
       const response = await fetchDataBackend(
-        `${backendUrl}/login`,
-        formData,
+        `${backendUrl}/login`, // Apuntamos a la nueva ruta
+        data,
         "POST"
       );
-      
+       
       if (response?.token) {
-        // Guardar token y redirigir
+        // El hook useFetch ya mostró el toast de éxito
         localStorage.setItem('token', response.token);
         navigate('/desktop');
       }
+      // Si hay un error (ej: 401, 404), el hook useFetch
+      // capturará el 'msg' del backend y lo mostrará como un toast de error.
+
     } catch (error) {
-      setError('Credenciales incorrectas. Inténtalo de nuevo.');
+      // El error ya es manejado y mostrado por el hook useFetch
+      console.error(error);
     } finally {
       setLoading(false);
     }
-
   };
 
   return (
     <AuthLayout title="Iniciar Sesión">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* handleSubmit(onSubmit) activa la validación de hook-form antes de llamar a onSubmit */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        
+        {/* --- CAMPO EMAIL --- */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-purple-200">
             Correo Electrónico
           </label>
           <input
             id="email"
-            name="email"
             type="email"
-            value={formData.email}
-            onChange={handleChange}
+            {...register('email', { // 'register' registra el input
+              required: 'El email es requerido' // Regla de validación
+            })}
             className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             placeholder="tu-correo@esfot.com"
-            required
           />
+          {/* Muestra el error si existe */}
+          {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
         </div>
+        
+        {/* --- CAMPO PASSWORD --- */}
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-purple-200">
             Contraseña
           </label>
           <input
             id="password"
-            name="password"
             type="password"
-            value={formData.password}
-            onChange={handleChange}
+            {...register('password', { // 'register' registra el input
+              required: 'La contraseña es requerida' // Regla de validación
+            })}
             className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             placeholder="Tu contraseña"
-            required
           />
+          {/* Muestra el error si existe */}
+          {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
         </div>
 
-        {error && <p className="text-sm text-center text-red-400">{error}</p>}
+        {/* El estado 'error' local se elimina, los errores de API se muestran en el Toast */}
 
+        {/* --- BOTÓN SUBMIT --- */}
         <div>
           <button
             type="submit"
