@@ -16,7 +16,8 @@ router.get('/recuperarPassword/:token',comprobarTokenPassword)
 
 router.post('/nuevoPassword/:token',crearNuevoPassword)
 
-router.post('/veterinario/login',login)
+router.post('/estudiante/login',login)
+
 
 
 export default router;
