@@ -26,7 +26,7 @@ const sendMailToRegister = (userMail, token) => {
             `
                 <h1>VirtualDesk</h1>
                 <p>Has solicitado restablecer tu contraseña.</p>
-                <a href="${process.env.URL_FRONTEND}reset/${token}">
+                <a href="${process.env.URL_FRONTEND}/reset/${token}">
                 Clic para restablecer tu contraseña
                 </a>
                 <hr>

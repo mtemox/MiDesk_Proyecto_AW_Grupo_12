@@ -46,7 +46,7 @@ const confirmarMail = async (req, res) => {
    
     }
 
-    const recuperarPassword = async (req, res) => {
+const recuperarPassword = async (req, res) => {
 
     try{
         //Paso 1
@@ -72,7 +72,7 @@ const confirmarMail = async (req, res) => {
 }
 
 
-    const comprobarTokenPassword = async (req, res) => {
+const comprobarTokenPassword = async (req, res) => {
         try{
             //Paso 1
             const{token} = req.params
@@ -89,7 +89,7 @@ const confirmarMail = async (req, res) => {
     }
 }
 
-    const crearNuevoPassword = async (req, res) => {
+const crearNuevoPassword = async (req, res) => {
 
         try{
             //Paso 1
@@ -115,7 +115,7 @@ const confirmarMail = async (req, res) => {
     }
 }
 
-     const login = async (req, res) => {
+const login = async (req, res) => {
         try{
             //Paso 1
             const {email,password} = req.body
@@ -152,7 +152,7 @@ const confirmarMail = async (req, res) => {
         res.status(500).json({ msg: `❌ Error en el servidor - ${error}` })
      }
 
-    }
+}
 
 export {
     registro,

@@ -47,88 +47,79 @@ function Register() {
     }
   };
 
+const inputClass = "w-full px-3 py-2 mt-1 text-white bg-gray-900 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent placeholder-gray-500";
+
   return (
     <AuthLayout title="Crear Cuenta">
-      {/* handleSubmit(onSubmit) activa la validación de hook-form antes de llamar a onSubmit */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         
-        {/* --- CAMPO NOMBRE --- */}
+        {/* NOMBRE */}
         <div>
-          <label htmlFor="nombre" className="block text-sm font-medium text-purple-200">Nombre Completo</label>
+          <label htmlFor="nombre" className="block text-sm font-medium text-gray-300">Nombre Completo</label>
           <input
             id="nombre"
             type="text"
-            {...register('nombre', { // 'register' registra el input
-              required: 'El nombre es requerido' // Regla de validación
-            })}
-            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            {...register('nombre', { required: 'El nombre es requerido' })}
+            className={inputClass}
             placeholder="Ingresa tu nombre completo"
           />
-          {/* Muestra el error si existe */}
-          {errors.nombre && <p className="mt-1 text-xs text-red-400">{errors.nombre.message}</p>}
+          {errors.nombre && <p className="mt-1 text-xs text-red-500 font-bold">{errors.nombre.message}</p>}
         </div>
 
-        {/* --- CAMPO EMAIL --- */}
+        {/* EMAIL */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-purple-200">Correo Electrónico</label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-300">Correo Electrónico</label>
           <input
             id="email"
             type="email"
             {...register('email', { 
               required: 'El email es requerido',
-              pattern: { // Validación con Expresión Regular
-                value: /\S+@\S+\.\S+/,
-                message: 'El formato de email no es válido'
-              }
+              pattern: { value: /\S+@\S+\.\S+/, message: 'Formato inválido' }
             })}
-            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={inputClass}
             placeholder="tu-correo@esfot.com"
           />
-          {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
+          {errors.email && <p className="mt-1 text-xs text-red-500 font-bold">{errors.email.message}</p>}
         </div>
 
-        {/* --- CAMPO PASSWORD --- */}
+        {/* PASSWORD */}
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-purple-200">Contraseña</label>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-300">Contraseña</label>
           <input
             id="password"
             type="password"
             {...register('password', { 
-              required: 'La contraseña es requerida',
-              minLength: {
-                value: 6,
-                message: 'Debe tener al menos 6 caracteres'
-              }
+              required: 'Requerido',
+              minLength: { value: 6, message: 'Mínimo 6 caracteres' }
             })}
-            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={inputClass}
             placeholder="Mínimo 6 caracteres"
           />
-          {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
+          {errors.password && <p className="mt-1 text-xs text-red-500 font-bold">{errors.password.message}</p>}
         </div>
 
-        {/* --- CAMPO CONFIRMAR PASSWORD --- */}
+        {/* CONFIRM PASSWORD */}
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-purple-200">Confirmar Contraseña</label>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">Confirmar Contraseña</label>
           <input
             id="confirmPassword"
             type="password"
             {...register('confirmPassword', { 
-              required: 'Debes confirmar la contraseña',
-              validate: value => // Validación personalizada
-                value === password || 'Las contraseñas no coinciden'
+              required: 'Confirma la contraseña',
+              validate: value => value === password || 'Las contraseñas no coinciden'
             })}
-            className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={inputClass}
             placeholder="Repite tu contraseña"
           />
-          {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
+          {errors.confirmPassword && <p className="mt-1 text-xs text-red-500 font-bold">{errors.confirmPassword.message}</p>}
         </div>
 
-        {/* --- BOTÓN SUBMIT --- */}
+        {/* BOTÓN */}
         <div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50"
+            className="w-full py-2 px-4 font-bold text-white bg-red-700 rounded-md hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black transition-all shadow-[0_0_10px_rgba(185,28,28,0.5)]"
           >
             {loading ? 'Registrando...' : 'Registrarse'}
           </button>
@@ -137,7 +128,7 @@ function Register() {
 
       <p className="text-sm text-center text-gray-400">
         ¿Ya tienes una cuenta? {' '}
-        <Link to="/login" className="font-medium text-purple-400 hover:text-purple-300">
+        <Link to="/login" className="font-medium text-red-500 hover:text-red-400 underline">
           Inicia sesión
         </Link>
       </p>
