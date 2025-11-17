@@ -21,16 +21,29 @@ function Login() {
       
       // 'data' ya contiene { email, password }
       const response = await fetchDataBackend(
-        `${backendUrl}/login`, // Apuntamos a la nueva ruta
+        `${backendUrl}/estudiante/login`, // Apuntamos a la nueva ruta
         data,
         "POST"
       );
        
-      if (response?.token) {
-        // El hook useFetch ya mostró el toast de éxito
-        localStorage.setItem('token', response.token);
-        navigate('/desktop');
-      }
+      // 2. Verificamos si llegó el token
+        if (response?.token) {
+            // Guardamos el token
+            localStorage.setItem('token', response.token);
+            
+            // Guardamos también los datos del usuario para usarlos en el sistema
+            // (Por ejemplo, para poner "Hola, Ariel" en el dashboard)
+            const userData = {
+                nombre: response.nombre,
+                rol: response.rol,
+                id: response._id
+            };
+            localStorage.setItem('user', JSON.stringify(userData));
+
+            // 3. Redirigimos
+            navigate('/desktop');
+        }
+        
       // Si hay un error (ej: 401, 404), el hook useFetch
       // capturará el 'msg' del backend y lo mostrará como un toast de error.
 

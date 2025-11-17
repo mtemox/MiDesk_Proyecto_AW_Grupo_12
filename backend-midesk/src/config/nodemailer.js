@@ -1,18 +1,23 @@
 import nodemailer from "nodemailer"
+import Transport from "nodemailer-brevo-transport" // Importamos el adaptador
 import dotenv from "dotenv"
 dotenv.config()
 
+// En lugar de configurar host/port, configuramos el adaptador de Brevo
+const transporter = nodemailer.createTransport(
+    new Transport({
+        apiKey: process.env.BREVO_API_KEY // Usamos la API Key (xkeysib-...)
+    })
+)
 
-
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    host: process.env.HOST_MAILTRAP,
-    port: process.env.PORT_MAILTRAP,
-    auth: {
-    user: process.env.USER_MAILTRAP,
-    pass: process.env.PASS_MAILTRAP,
-    },
-})
+// Verificar conexión (Esto validará si la API Key es correcta)
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log("❌ Error de conexión con Brevo API:", error);
+    } else {
+        console.log("✅ Servidor listo para enviar correos (Vía API Puerto 443)");
+    }
+});
 
 /**
  * Función genérica para enviar correos
@@ -24,12 +29,15 @@ const sendMail = async (to, subject, html) => {
 
     try {
         const info = await transporter.sendMail({
-            from: '"VirtualDesk" <admin@desk.com>',
+            // OJO IMPORTANTE: Brevo es estricto.
+            // El 'from' DEBE ser el correo con el que te registraste en Brevo
+            // Si pones 'admin@desk.com' y no es tuyo, fallará.
+            from: `"VirtualDesk" <${process.env.USER_MAILTRAP}>`, 
             to,
             subject,
             html,
         })
-        console.log("✅ Email enviado:", info.messageId)
+        console.log("✅ Email enviado ID:", info.messageId)
 
     } catch (error) {
         console.error("❌ Error enviando email:", error.message)
@@ -37,4 +45,3 @@ const sendMail = async (to, subject, html) => {
 }
 
 export default sendMail
-

@@ -1,4 +1,5 @@
 
+import generarJWT from "../helpers/crearJWT.js"
 import { sendMailToRegister,sendMailToRecoveryPassword } from "../helpers/sendMail.js"
 import Estudiante from "../models/estudiante.js"
 
@@ -129,10 +130,14 @@ const confirmarMail = async (req, res) => {
             if(!verificarPassword) return res.status(401).json({ msg: "El password no es correcto" })
 
             //Paso 3
+            // Se genera el token JWT para la sesión
+            const token = generarJWT(estudianteBDD._id, estudianteBDD.rol);
+
             const{nombre,apellido,direccion,telefono,_id,rol} = estudianteBDD
 
             //Paso 4 
             res.status(200).json({
+                token,
                 nombre,
                 apellido,
                 direccion,
