@@ -1,8 +1,7 @@
 
-import generarJWT from "../helpers/crearJWT.js"
 import { sendMailToRegister,sendMailToRecoveryPassword } from "../helpers/sendMail.js"
 import Estudiante from "../models/estudiante.js"
-
+import { crearTokenJWT } from "../middlewares/JWT.js"
 
 const registro = async (req,res)=>{
 
@@ -46,7 +45,7 @@ const confirmarMail = async (req, res) => {
    
     }
 
-const recuperarPassword = async (req, res) => {
+    const recuperarPassword = async (req, res) => {
 
     try{
         //Paso 1
@@ -72,7 +71,7 @@ const recuperarPassword = async (req, res) => {
 }
 
 
-const comprobarTokenPassword = async (req, res) => {
+    const comprobarTokenPassword = async (req, res) => {
         try{
             //Paso 1
             const{token} = req.params
@@ -89,7 +88,7 @@ const comprobarTokenPassword = async (req, res) => {
     }
 }
 
-const crearNuevoPassword = async (req, res) => {
+    const crearNuevoPassword = async (req, res) => {
 
         try{
             //Paso 1
@@ -115,7 +114,7 @@ const crearNuevoPassword = async (req, res) => {
     }
 }
 
-const login = async (req, res) => {
+     const login = async (req, res) => {
         try{
             //Paso 1
             const {email,password} = req.body
@@ -130,10 +129,8 @@ const login = async (req, res) => {
             if(!verificarPassword) return res.status(401).json({ msg: "El password no es correcto" })
 
             //Paso 3
-            // Se genera el token JWT para la sesión
-            const token = generarJWT(estudianteBDD._id, estudianteBDD.rol);
-
             const{nombre,apellido,direccion,telefono,_id,rol} = estudianteBDD
+            const token = crearTokenJWT(estudianteBDD._id,estudianteBDD.rol)
 
             //Paso 4 
             res.status(200).json({
@@ -152,7 +149,14 @@ const login = async (req, res) => {
         res.status(500).json({ msg: `❌ Error en el servidor - ${error}` })
      }
 
+    }
+
+    const perfil =(req,res)=>{
+	const {token,confirmEmail,createdAt,updatedAt,__v,...datosPerfil} = req.veterinarioHeader
+    res.status(200).json(datosPerfil)
 }
+
+
 
 export {
     registro,
@@ -160,6 +164,7 @@ export {
     recuperarPassword,
     comprobarTokenPassword,
     crearNuevoPassword,
-    login
+    login,
+    perfil
     
 }
