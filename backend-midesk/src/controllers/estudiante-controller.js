@@ -242,23 +242,17 @@ const getDesktop = async (req, res) => {
 const createItem = async (req, res) => {
   try {
     const userId = req.estudianteHeader._id;
-    const { type, name, url, parentId, x, y } = req.body;
+    // CORRECCIÓN: Agregamos 'content' aquí 👇
+    const { type, name, url, parentId, x, y, content } = req.body; 
 
-    
     console.log("👉 createItem userId:", userId);
-    console.log("👉 createItem body:", req.body);
 
-    // Validaciones básicas
     if (!type || !name) {
-      return res
-        .status(400)
-        .json({ ok: false, msg: "Tipo y nombre son obligatorios" });
+      return res.status(400).json({ ok: false, msg: "Tipo y nombre son obligatorios" });
     }
 
     if (type === "link" && !url) {
-      return res
-        .status(400)
-        .json({ ok: false, msg: "La URL es obligatoria para enlaces" });
+      return res.status(400).json({ ok: false, msg: "La URL es obligatoria para enlaces" });
     }
 
     const newItem = new Item({
@@ -267,6 +261,7 @@ const createItem = async (req, res) => {
       name,
       url: url || null,
       parentId: parentId || null,
+      content: content || "", // Ahora sí existe la variable
       position: {
         x: x ?? 100,
         y: y ?? 100,
@@ -282,9 +277,7 @@ const createItem = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error en createItem:", error);
-    return res
-      .status(500)
-      .json({ ok: false, msg: `Error en el servidor - ${error}` });
+    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
   }
 };
 
@@ -345,6 +338,4 @@ export {
     getDesktop,
     createItem,
     deleteItem 
-    
-    
 }

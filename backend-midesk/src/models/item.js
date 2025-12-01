@@ -30,6 +30,11 @@ const itemSchema = new Schema(
       default: null,
     },
 
+    content: {
+      type: String, // Aquí se guardará el texto de la nota o las líneas de código
+      default: "",  
+    },
+
     // Si es ítem raíz => null
     parentId: {
       type: Schema.Types.ObjectId,
