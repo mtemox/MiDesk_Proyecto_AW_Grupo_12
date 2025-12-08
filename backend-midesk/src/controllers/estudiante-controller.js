@@ -155,7 +155,7 @@ const confirmarMail = async (req, res) => {
     }
 
     const perfil =(req,res)=>{
-    const {token,confirmEmail,createdAt,updatedAt,__v,...datosPerfil} = req.estudianteHeader
+    const {token,confirmMail,createdAt,updatedAt,__v,...datosPerfil} = req.estudianteHeader
     res.status(200).json(datosPerfil)
     }
 
@@ -242,17 +242,23 @@ const getDesktop = async (req, res) => {
 const createItem = async (req, res) => {
   try {
     const userId = req.estudianteHeader._id;
-    // CORRECCIÓN: Agregamos 'content' aquí 👇
-    const { type, name, url, parentId, x, y, content } = req.body; 
+    const { type, name, url, parentId, x, y } = req.body;
 
+    
     console.log("👉 createItem userId:", userId);
+    console.log("👉 createItem body:", req.body);
 
+    // Validaciones básicas
     if (!type || !name) {
-      return res.status(400).json({ ok: false, msg: "Tipo y nombre son obligatorios" });
+      return res
+        .status(400)
+        .json({ ok: false, msg: "Tipo y nombre son obligatorios" });
     }
 
     if (type === "link" && !url) {
-      return res.status(400).json({ ok: false, msg: "La URL es obligatoria para enlaces" });
+      return res
+        .status(400)
+        .json({ ok: false, msg: "La URL es obligatoria para enlaces" });
     }
 
     const newItem = new Item({
@@ -261,7 +267,6 @@ const createItem = async (req, res) => {
       name,
       url: url || null,
       parentId: parentId || null,
-      content: content || "", // Ahora sí existe la variable
       position: {
         x: x ?? 100,
         y: y ?? 100,
@@ -277,7 +282,9 @@ const createItem = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error en createItem:", error);
-    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+    return res
+      .status(500)
+      .json({ ok: false, msg: `Error en el servidor - ${error}` });
   }
 };
 
@@ -325,6 +332,85 @@ const deleteItem = async (req, res) => {
   }
 };
 
+const renombrarItem = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ ok: false, msg: "El nombre es obligatorio" });
+    }
+
+    const item = await Item.findOneAndUpdate(
+      { _id: id, userId },     
+      { name },
+      { new: true }
+    );
+
+    if (!item) {
+      return res.status(404).json({
+        ok: false,
+        msg: "Ítem no encontrado o no pertenece al usuario"
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      msg: "Ítem renombrado correctamente",
+      item
+    });
+
+  } catch (error) {
+    console.error("Error en renameItem:", error);
+    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+  }
+};
+
+
+
+const moverItem = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+    const { id } = req.params;
+    const { parentId, x, y } = req.body;
+
+    const updateData = {
+      parentId: parentId ?? null
+    };
+
+    if (x !== undefined || y !== undefined) {
+      updateData.position = {
+        x: x ?? 100,
+        y: y ?? 100
+      };
+    }
+
+    const item = await Item.findOneAndUpdate(
+      { _id: id, userId },     // validar propietario
+      updateData,
+      { new: true }
+    );
+
+    if (!item) {
+      return res.status(404).json({
+        ok: false,
+        msg: "Ítem no encontrado o no pertenece al usuario"
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      msg: "Ítem movido correctamente",
+      item
+    });
+
+  } catch (error) {
+    console.error("Error en moveItem:", error);
+    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+  }
+};
+
 export {
     registro,
     confirmarMail,
@@ -337,5 +423,9 @@ export {
     actualizarPerfil,
     getDesktop,
     createItem,
-    deleteItem 
+    deleteItem,
+    renombrarItem,
+    moverItem
+    
+    
 }
