@@ -1,5 +1,6 @@
 import {Router} from 'express'
-import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem  } from '../controllers/estudiante-controller.js';
+import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
+moverItem,renombrarItem  } from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
 const router = Router()
@@ -33,7 +34,12 @@ router.get("/desktop", verificarTokenJWT, getDesktop);
 
 // Crear un nuevo ítem
 router.post("/items", verificarTokenJWT, createItem);
+
 //ID= de la carpeta que quieras eliminar 
 router.delete('/items/:id', verificarTokenJWT, deleteItem);
+
+router.patch('/items/:id/renombrar', verificarTokenJWT, renombrarItem);
+
+router.patch('/items/:id/mover', verificarTokenJWT, moverItem);
 
 export default router;
