@@ -2,7 +2,7 @@
 import React from 'react';
 import { Trash2, Link as LinkIcon, FolderPlus } from 'lucide-react'; // Íconos opcionales
 
-function ContextMenu({ isVisible, x, y, onNewLink, selectedItem, onDelete }) {
+function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, selectedItem, onDelete }) {
   
   if (!isVisible) return null;
 
@@ -16,14 +16,20 @@ function ContextMenu({ isVisible, x, y, onNewLink, selectedItem, onDelete }) {
       <ul className="py-1">
         
         {/* Opciones Generales (siempre visibles) */}
+        
+        {/* Nueva Carpeta */}
+        <li 
+           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
+           onClick={onNewFolder} // <--- AQUI ESTABA EL PROBLEMA (Faltaba esto)
+        >
+           <FolderPlus size={14} /> Nueva Carpeta
+        </li>
+        
         <li 
           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
           onClick={onNewLink}
         >
           <LinkIcon size={14} /> Nuevo Enlace
-        </li>
-        <li className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2">
-           <FolderPlus size={14} /> Nueva Carpeta
         </li>
 
         {/* Separador */}

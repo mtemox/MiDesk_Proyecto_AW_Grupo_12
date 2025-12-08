@@ -10,6 +10,8 @@ import ContextMenu from './ContextMenu';
 import Icon from './Icon'; 
 import Modal from './Modal'; // <-- NUEVO: Importar Modal
 import NewLinkForm from './NewLinkForm'; // <-- NUEVO: Importar Formulario
+import FolderContent from './FolderContent';
+import NewFolderForm from './NewFolderForm';
 
 // Widgets y Apps
 import CodeEditor from './CodeEditor'; // <-- NUEVO
@@ -125,6 +127,9 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
   // Hook para peticiones
   const fetchDataBackend = useFetch();
 
+  // modalMode puede ser: 'link' | 'folder' | null
+  const [modalMode, setModalMode] = useState(null);
+
   // PASO 3: Simular la carga de datos (fetch)
   useEffect(() => {
     const loadUserItems = async () => {
@@ -222,17 +227,24 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
   // <-- NUEVO: Cierra el Menú y Abre el Modal
   const handleOpenNewLinkModal = () => {
     handleCloseMenu(); // Cierra el menú contextual
+    setModalMode('link');
     setIsModalVisible(true); // Abre el modal
   };
 
-
+  const handleOpenNewFolderModal = () => {
+    handleCloseMenu();
+    setModalMode('folder'); // Modo Carpeta
+    setIsModalVisible(true);
+  };
 
   // <-- NUEVO: Cierra el Modal
   const closeModal = () => {
     setIsModalVisible(false);
+    setModalMode(null); // Reseteamos modo
   };
 
   // <-- NUEVO: Lógica para SB-F-004 (Crear ícono y actualizar UI)
+  // REMPLAZADO
   const handleCreateLink = async (formData) => {
     const token = localStorage.getItem('token');
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -276,6 +288,53 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         console.error("Error creando ítem:", error);
     }
   };
+  // FIN REMPLAZO
+
+  const handleCreateItem = async (formData) => {
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    // Determinamos el tipo según el modo del modal
+    const itemType = modalMode === 'link' ? 'link' : 'folder';
+
+    // Preparamos datos para el Backend (Endpoint: POST /items)
+    const newItemData = {
+        type: itemType,
+        name: formData.name,
+        url: formData.url || null, // Solo si es link
+        x: 100, // Podrías usar Math.random() para variar la posición
+        y: 100
+    };
+
+    try {
+        const response = await fetchDataBackend(
+            `${backendUrl}/items`,
+            newItemData,
+            "POST",
+            { Authorization: `Bearer ${token}` }
+        );
+
+        if (response && response.ok) {
+            const createdItem = response.item;
+            
+            // Formateamos para el UI
+            const newIconUI = {
+                _id: createdItem._id,
+                nombre: createdItem.name,
+                imgSrc: getIconImage(createdItem.type), // Usa tu helper existente
+                type: createdItem.type,
+                url: createdItem.url,
+                windowOptions: { defaultWidth: 500, defaultHeight: 400 } // Opcional
+            };
+
+            setIcons(prev => [...prev, newIconUI]);
+            closeModal();
+            toast.success(itemType === 'folder' ? "Carpeta creada" : "Enlace creado");
+        }
+    } catch (error) {
+        console.error("Error creando ítem:", error);
+    }
+  };
 
   // --- 3. CONSUMIR ENDPOINT DELETE (Nuevo) ---
   const handleDeleteItem = async (item) => {
@@ -311,8 +370,17 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
   // --- FUNCIÓN PARA RENDERIZAR EL CONTENIDO DE LA APP ---
   // Esto decide qué mostrar DENTRO de la ventana
-  const renderAppContent = (appId) => {
+  const renderAppContent = (appId, data) => {
     switch (appId) {
+
+      case 'folder': // <--- NUEVO CASO PARA CARPETAS
+        return (
+          <FolderContent 
+            folderId={data?._id} 
+            folderName={data?.nombre} 
+          />
+        );
+
       case 'notepad':
         return (
           <CodeEditor 
@@ -399,12 +467,22 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         x={menuState.x} 
         y={menuState.y} 
         selectedItem={menuState.selectedItem}
-        onNewLink={handleOpenNewLinkModal} 
+        onNewLink={handleOpenNewLinkModal}
+        onNewFolder={handleOpenNewFolderModal}
         onDelete={handleDeleteItem}
       />
 
-      <Modal isVisible={isModalVisible} onClose={closeModal} title="Nuevo Enlace Web">
-        <NewLinkForm onSubmit={handleCreateLink} />
+      <Modal 
+        isVisible={isModalVisible} 
+        onClose={closeModal} 
+        title={modalMode === 'folder' ? "Nueva Carpeta" : "Nuevo Enlace Web"}
+      >
+        {/* Renderizamos condicionalmente el formulario */}
+        {modalMode === 'folder' ? (
+             <NewFolderForm onSubmit={handleCreateItem} />
+        ) : (
+             <NewLinkForm onSubmit={handleCreateItem} />
+        )}
       </Modal>
 
       {/* Ventanas */}
@@ -425,7 +503,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
                 defaultWidth={win.defaultWidth}
                 defaultHeight={win.defaultHeight}
               >
-                {renderAppContent(win.appId)}
+                {renderAppContent(win.appId, win.data)}
               </AppWindow>
             </div>
         ))}

@@ -8,7 +8,12 @@ const Icon = ({ nombre, imgSrc, iconData, onOpen, onContextMenu }) => {
     if (iconData?.type === 'link' && iconData.url) {
       window.open(iconData.url, '_blank', 'noopener,noreferrer');
     } else if (iconData && onOpen) {
-      onOpen(iconData.appId || iconData.type, iconData.nombre, iconData.windowOptions);
+      onOpen(
+        iconData.appId || iconData.type, // appId o "folder"
+        iconData.nombre, 
+        iconData.windowOptions,
+        iconData // <--- Pasamos todo el objeto (incluye _id) como 'data'
+      );
     }
   };
 

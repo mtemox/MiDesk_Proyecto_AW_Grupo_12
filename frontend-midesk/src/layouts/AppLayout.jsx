@@ -7,7 +7,7 @@ function AppLayout() {
   const [openWindows, setOpenWindows] = useState([]);
   const [nextZ, setNextZ] = useState(10);
 
-  const handleOpenWindow = (appId, title, windowOptions = {}) => {
+  const handleOpenWindow = (appId, title, windowOptions = {}, data = null) => {
     if (appId === 'profile' && !windowOptions.defaultWidth) {
         windowOptions = { defaultWidth: 500, defaultHeight: 600 };
     }
@@ -31,6 +31,7 @@ function AppLayout() {
         defaultY,
         isMinimized: false, // 👈 Nuevo estado
         isMaximized: false, // 👈 Nuevo estado
+        data,
         ...windowOptions 
       }
     ]);
