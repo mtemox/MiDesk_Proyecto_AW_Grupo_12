@@ -38,8 +38,6 @@ function Login() {
             // Guardamos el token
             localStorage.setItem('token', response.token);
             
-            // Guardamos también los datos del usuario para usarlos en el sistema
-            // (Por ejemplo, para poner "Hola, Ariel" en el dashboard)
             const userData = {
                 nombre: response.nombre,
                 rol: response.rol,
@@ -47,8 +45,8 @@ function Login() {
             };
             localStorage.setItem('user', JSON.stringify(userData));
 
-            // 3. Redirigimos
-            navigate('/desktop');
+            // 3. Redirigimos al DASHBOARD en lugar del Desktop
+            navigate('/dashboard'); // 👈 CAMBIO AQUÍ (Antes era '/desktop')
         }
         
       // Si hay un error (ej: 401, 404), el hook useFetch

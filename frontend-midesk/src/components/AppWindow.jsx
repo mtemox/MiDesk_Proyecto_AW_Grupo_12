@@ -5,7 +5,8 @@ import { X, Minus, Square, Maximize2 } from 'lucide-react'; // Íconos opcionale
 
 function AppWindow({ 
     title, children, onClose, onMinimize, onMaximize, zIndex, onFocus, 
-    defaultWidth, defaultHeight, defaultX, defaultY, isMaximized 
+    defaultWidth, defaultHeight, defaultX, defaultY, isMaximized,
+    isActive
 }) {
 
   return (

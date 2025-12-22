@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage';
 import { Confirm } from './pages/Confirm';
 import Forgot from './pages/Forgot';
 import Reset from './pages/Reset';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -30,6 +31,16 @@ function App() {
       
       <Route path="/reset/:token" element={<Reset />} />
       
+      {/* Ruta Dashboard */}
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+
       {/* Ruta principal de la App (Protegida) */}
       <Route 
         path="/desktop" 

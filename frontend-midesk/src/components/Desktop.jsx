@@ -39,53 +39,13 @@ import wordIcon from '../assets/icons/doc.png';
 // (En el futuro, esto vendrá de una API real)
 // Traemos las imágenes que ya tenías
 
-const systemApps = [
-  {
-    _id: 'sys-1',
-    nombre: 'Clima',
-    imgSrc: weatherIcon,
-    type: 'app',
-    appId: 'weather',
-    windowOptions: { defaultWidth: 300, defaultHeight: 350 }
-  },
-  {
-    _id: 'sys-2',
-    nombre: 'Noticias',
-    imgSrc: newsIcon,
-    type: 'app',
-    appId: 'news',
-    windowOptions: { defaultWidth: 400, defaultHeight: 500 }
-  },
-  {
-    _id: 'sys-3',
-    nombre: 'Fondos',
-    imgSrc: wallpaperIcon,
-    type: 'app',
-    appId: 'wallpaper',
-    windowOptions: { defaultWidth: 500, defaultHeight: 350 }
-  },
-  {
-    _id: 'sys-4',
-    nombre: 'Word Pro',
-    imgSrc: wordIcon,
-    type: 'app',
-    appId: 'wordprocessor',
-    windowOptions: { defaultWidth: 700, defaultHeight: 500 }
-  },
-  {
-    _id: 'sys-5',
-    nombre: 'VS Code (Sim)',
-    imgSrc: codeIcon,
-    type: 'app',
-    appId: 'codeEditor',
-    windowOptions: { defaultWidth: 800, defaultHeight: 600 }
-  },
-  {
-    _id: 'sys-6',
-    nombre: 'Mi Equipo',
-    imgSrc: computerIcon,
-    type: 'computer'
-  },
+const systemAppsBase = [
+  { _id: 'sys-6', nombre: 'Mi Equipo', imgSrc: computerIcon, type: 'computer' },
+  { _id: 'sys-5', nombre: 'VS Code (Sim)', imgSrc: codeIcon, type: 'app', appId: 'codeEditor' },
+  { _id: 'sys-4', nombre: 'Word Pro', imgSrc: wordIcon, type: 'app', appId: 'wordprocessor' },
+  { _id: 'sys-3', nombre: 'Fondos', imgSrc: wallpaperIcon, type: 'app', appId: 'wallpaper' },
+  { _id: 'sys-2', nombre: 'Noticias', imgSrc: newsIcon, type: 'app', appId: 'news' },
+  { _id: 'sys-1', nombre: 'Clima', imgSrc: weatherIcon, type: 'app', appId: 'weather' },
 ];
 
 // --- HELPER: Mapear Tipo de BD a Imagen ---
@@ -103,7 +63,11 @@ const getIconImage = (type) => {
 function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMinimizeWindow, onMaximizeWindow }) {
   
   // PASO 2: Crear el estado para los íconos
-  const [icons, setIcons] = useState(systemApps);
+  const [icons, setIcons] = useState([]);
+
+  // --- CONFIGURACIÓN DE LA REJILLA ---
+  const CELL_WIDTH = 100;
+  const CELL_HEIGHT = 110;
 
   // <-- NUEVO: Estado para el menú contextual
   // 'isVisible': si se muestra o no
@@ -117,12 +81,6 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
   // <-- NUEVO: Estado para controlar el modal
   const [isModalVisible, setIsModalVisible] = useState(false);
-  // ¡NUEVO! Estado para las ventanas abiertas
-  // Será un array de objetos
-  // const [openWindows, setOpenWindows] = useState([]);
-
-  // ¡NUEVO! Contador para el z-index (para saber cuál va encima)
-  // const [nextZ, setNextZ] = useState(10); // Empezamos en z-10
 
   // Hook para peticiones
   const fetchDataBackend = useFetch();
@@ -130,44 +88,168 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
   // modalMode puede ser: 'link' | 'folder' | null
   const [modalMode, setModalMode] = useState(null);
 
-  // PASO 3: Simular la carga de datos (fetch)
+  // --- FUNCIÓN PARA CALCULAR POSICIONES SEGÚN RESOLUCIÓN ---
+  const calculateSystemPositions = () => {
+  const marginX = 10; // Más pegado a la izquierda
+  const marginY = 10; // Más pegado arriba
+  const iconWidth = 90; // Ancho del icono (74) + pequeño espacio
+  const iconHeight = 100; // Alto del icono (88) + pequeño espacio
+  const taskbarHeight = 55; // Espacio de seguridad para tu taskbar
+  
+  const availableHeight = window.innerHeight - taskbarHeight - marginY;
+
+  return systemAppsBase.map((app, index) => {
+    const iconsPerCol = Math.floor(availableHeight / iconHeight);
+    const col = Math.floor(index / iconsPerCol);
+    const row = index % iconsPerCol;
+
+    return {
+      ...app,
+      position: {
+        x: marginX + (col * iconWidth),
+        y: marginY + (row * iconHeight)
+      }
+    };
+  });
+};
+
+  // --- CARGA INICIAL Y REDIMENSIONAMIENTO ---
   useEffect(() => {
-    const loadUserItems = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
+    const loadEverything = async () => {
+      // 1. Calculamos apps de sistema según la resolución actual
+      const positionedSystemApps = calculateSystemPositions();
 
-        const backendUrl = import.meta.env.VITE_BACKEND_URL;
-        
-        try {
-            // Hacemos GET /desktop enviando el Token
-            const data = await fetchDataBackend(
-                `${backendUrl}/desktop`,
-                null, 
-                "GET", 
-                { Authorization: `Bearer ${token}` } // 👈 Header Auth
-            );
+      // 2. Cargar items del usuario desde el Backend
+      const token = localStorage.getItem('token');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      
+      try {
+        const data = await fetchDataBackend(`${backendUrl}/desktop`, null, "GET", {
+          Authorization: `Bearer ${token}`
+        });
 
-            if (data && data.ok && data.items) {
-                // Convertimos los ítems de la BD al formato del Frontend
-                const userItems = data.items.map(item => ({
-                    _id: item._id,
-                    nombre: item.name,
-                    imgSrc: getIconImage(item.type), // Asignamos imagen según tipo
-                    type: item.type, // 'link', 'folder', etc.
-                    url: item.url,   // Solo para links
-                    // Mantenemos otros datos si hacen falta
-                }));
+        if (data && data.ok) {
+          const userItems = data.items.map(item => ({
+            _id: item._id,
+            nombre: item.name,
+            imgSrc: getIconImage(item.type),
+            type: item.type,
+            url: item.url,
+            position: item.position // Estos ya traen su posición de la BD
+          }));
 
-                // Fusionamos Apps del Sistema + Ítems del Usuario
-                setIcons([...systemApps, ...userItems]);
-            }
-        } catch (error) {
-            console.error("Error cargando escritorio:", error);
+          // Mezclamos: Apps de sistema calculadas + Items de usuario
+          setIcons([...positionedSystemApps, ...userItems]);
         }
+      } catch (error) {
+        setIcons(positionedSystemApps); // Si falla el fetch, al menos mostramos sistema
+      }
     };
 
-    loadUserItems();
-  }, []); // Se ejecuta al montar
+    loadEverything();
+
+    // Opcional: Recalcular si el usuario cambia el tamaño de la ventana
+    const handleResize = () => {
+      setIcons(prev => {
+        const systemUpdated = calculateSystemPositions();
+        const userOnes = prev.filter(i => !i._id.toString().startsWith('sys-'));
+        return [...systemUpdated, ...userOnes];
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // --- NUEVA FUNCIÓN: Persistir movimiento en Backend ---
+  const handleMoveIcon = async (id, x, y) => {
+  if (id.toString().startsWith('sys-')) return;
+
+  // Ajustado al nuevo tamaño reducido
+  const ICON_WIDTH = 74;  
+  const ICON_HEIGHT = 88; 
+
+  let finalX = x;
+  let finalY = y;
+
+  let isOccupied = true;
+  let safetyNet = 0;
+
+  while (isOccupied && safetyNet < 100) {
+    const collision = icons.find(icon => {
+      if (icon._id === id) return false;
+      
+      const otherX = icon.position?.x || 0;
+      const otherY = icon.position?.y || 0;
+
+      // Colisión AABB ajustada al nuevo tamaño
+      return (
+        finalX < otherX + ICON_WIDTH &&
+        finalX + ICON_WIDTH > otherX &&
+        finalY < otherY + ICON_HEIGHT &&
+        finalY + ICON_HEIGHT > otherY
+      );
+    });
+
+    if (collision) {
+      finalX += 15; // Desplazamiento menor para mayor precisión
+      if (finalX + ICON_WIDTH > window.innerWidth - 10) {
+        finalX = 10;
+        finalY += 15;
+      }
+      safetyNet++;
+    } else {
+      isOccupied = false;
+    }
+  }
+
+  // Actualización optimista (Sin LAG)
+  setIcons(prev => prev.map(icon => 
+    icon._id === id ? { ...icon, position: { x: finalX, y: finalY } } : icon
+  ));
+
+  const token = localStorage.getItem('token');
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+  try {
+    // Sincronización con Backend (Persiste el orden y posición)
+    await fetchDataBackend(
+      `${backendUrl}/items/${id}/mover`,
+      { x: finalX, y: finalY },
+      "PATCH",
+      { Authorization: `Bearer ${token}` }
+    );
+  } catch (error) {
+    console.error("Error al persistir posición:", error);
+  }
+};
+
+    const handleRenameIcon = async (id, name) => {
+    // Evitamos renombrar apps del sistema
+    if (id.toString().startsWith('sys-')) return;
+
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    try {
+      // Según tu Backend: router.patch('/items/:id/renombrar', ...)
+      const response = await fetchDataBackend(
+        `${backendUrl}/items/${id}/renombrar`,
+        { name }, // Enviamos el nuevo nombre en el body
+        "PATCH",
+        { Authorization: `Bearer ${token}` }
+      );
+
+      if (response && response.ok) {
+        // Actualizamos el estado local para que el cambio sea visible
+        setIcons(prev => prev.map(icon => 
+          icon._id === id ? { ...icon, nombre: name } : icon
+        ));
+      }
+    } catch (error) {
+      console.error("❌ Error al renombrar el ícono:", error);
+    }
+  };
 
   // <-- NUEVO: Manejador para el Clic Derecho
   const handleContextMenu = (e) => {
@@ -457,6 +539,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             iconData={icon} 
             onOpen={onOpenWindow}
             onContextMenu={handleContextMenuIcon}
+            onMove={handleMoveIcon}
+            onRename={handleRenameIcon}
           />
         ))}
       </div>
