@@ -3,6 +3,9 @@ import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPasswo
 moverItem,renombrarItem  } from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
+import { summarizeText } from "../controllers/ai-controller.js";
+
+
 const router = Router()
 
 
@@ -41,5 +44,7 @@ router.delete('/items/:id', verificarTokenJWT, deleteItem);
 router.patch('/items/:id/renombrar', verificarTokenJWT, renombrarItem);
 
 router.patch('/items/:id/mover', verificarTokenJWT, moverItem);
+
+router.post('/ai/summarize', verificarTokenJWT, summarizeText);
 
 export default router;
