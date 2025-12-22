@@ -5,7 +5,7 @@ const sendMailToRegister = (userMail, token) => {
 
     return sendMail(
         userMail,
-        "Bienvenido a VirtualDesk",
+        "Bienvenido a VirtualDesk 🐶 😺",
         `
             <h1>Confirma tu cuenta</h1>
             <p>Hola, haz clic en el siguiente enlace para confirmar tu cuenta:</p>
@@ -41,7 +41,6 @@ export {
     sendMailToRegister,
     sendMailToRecoveryPassword
 }
-
 
 
 

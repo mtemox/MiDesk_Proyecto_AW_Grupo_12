@@ -1,5 +1,6 @@
 // src/models/item.js
 import { Schema, model } from "mongoose";
+import bcrypt from "bcryptjs"
 
 const itemSchema = new Schema(
   {
@@ -28,11 +29,6 @@ const itemSchema = new Schema(
     url: {
       type: String,
       default: null,
-    },
-
-    content: {
-      type: String, // Aquí se guardará el texto de la nota o las líneas de código
-      default: "",  
     },
 
     // Si es ítem raíz => null

@@ -3,7 +3,8 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-
+import cloudinary from 'cloudinary'
+import fileUpload from "express-fileupload"
 import routerEstudiantes from './routers/estudiante-routes.js'
 
 
@@ -11,9 +12,25 @@ import routerEstudiantes from './routers/estudiante-routes.js'
 const app = express()
 dotenv.config()
 
+
+
+
 // Configuraciones
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+})
+
 
 // Middlewares
+app.use(express.json())
+app.use(cors())
+ 
+app.use(fileUpload({
+    useTempFiles : true,
+    tempFileDir : './uploads'
+}))
 
 app.use(express.json());
 app.use(cors());
