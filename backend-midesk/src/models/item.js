@@ -1,6 +1,5 @@
 // src/models/item.js
 import { Schema, model } from "mongoose";
-import bcrypt from "bcryptjs"
 
 const itemSchema = new Schema(
   {
@@ -11,14 +10,14 @@ const itemSchema = new Schema(
       required: true,
     },
 
-    // Tipo de ítem: carpeta, nota, código, enlace, etc.
+    // Tipo de ítem: carpeta, nota, código, enlace
     type: {
       type: String,
       enum: ["folder", "note", "code", "link"],
       required: true,
     },
 
-    // Nombre que se ve en el escritorio
+    // Nombre visible en el escritorio
     name: {
       type: String,
       required: true,
@@ -38,11 +37,26 @@ const itemSchema = new Schema(
       default: null,
     },
 
-    // Posición en el escritorio (para el frontend)
+    // Posición en el escritorio
     position: {
       x: { type: Number, default: 100 },
       y: { type: Number, default: 100 },
     },
+
+    // 🆕 Compartido con otros usuarios
+    sharedWith: [
+      {
+        userId: {
+          type: Schema.Types.ObjectId,
+          ref: "estudiante",
+        },
+        permission: {
+          type: String,
+          enum: ["read", "edit"],
+          default: "read",
+        },
+      },
+    ],
   },
   {
     timestamps: true,

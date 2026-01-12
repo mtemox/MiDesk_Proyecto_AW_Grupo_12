@@ -9,8 +9,8 @@ import routerEstudiantes from './routers/estudiante-routes.js'
 
 
 // Inicializaciones
-const app = express()
-dotenv.config()
+const app = express();
+dotenv.config();
 
 
 

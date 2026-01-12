@@ -1,40 +1,31 @@
-import hf from "../services/huggingface.js";
+import axios from "axios";
 
-const summarizeText = async (req, res) => {
+const improveTextIA = async (req, res) => {
   try {
     const { text } = req.body;
+    if (!text) return res.status(400).json({ msg: "Texto requerido" });
 
-    if (!text) {
-      return res.status(400).json({ ok: false, msg: "El texto es obligatorio" });
-    }
+    const url = "https://api-inference.huggingface.com/models/facebook/bart-large-cnn";
 
-    try {
-      const result = await hf.summarization({
-        model: process.env.HF_MODEL_SUMMARY,
-        inputs: text,
-      });
+    const response = await axios.post(
+      url,
+      { inputs: `Improve the following text in Spanish:\n\n${text}` },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.HF_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 60000,
+      }
+    );
 
-      return res.json({
-        ok: true,
-        source: "huggingface",
-        summary: result.summary_text
-      });
+    const improved = response.data?.[0]?.generated_text ?? response.data;
 
-    } catch (hfError) {
-      console.warn("⚠️ HuggingFace no disponible, usando fallback");
-
-      // Fallback local
-      return res.json({
-        ok: true,
-        source: "fallback",
-        summary: text.slice(0, 120) + "..."
-      });
-    }
-
+    return res.status(200).json({ ok: true, improvedText: improved });
   } catch (error) {
-    return res.status(500).json({ ok: false, msg: "Error IA" });
+    console.log("❌ HF ERROR MSG:", error.message);
+    return res.status(500).json({ msg: "Error IA", error: error.message });
   }
 };
 
-
-export {summarizeText}
+export { improveTextIA };

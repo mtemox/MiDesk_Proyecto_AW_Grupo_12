@@ -1,5 +1,8 @@
-import { InferenceClient } from "@huggingface/inference";
+export const mejorarTexto = async (texto) => {
+  const res = await hf.post(
+    "/google/flan-t5-base",
+    { inputs: `Improve this text: ${texto}` }
+  );
 
-const hf = new InferenceClient(process.env.HF_TOKEN);
-
-export default hf;
+  return res.data[0].generated_text;
+};

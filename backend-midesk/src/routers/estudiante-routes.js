@@ -1,9 +1,9 @@
 import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
-moverItem,renombrarItem  } from '../controllers/estudiante-controller.js';
+moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem  } from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
-import { summarizeText } from "../controllers/ai-controller.js";
+import { improveTextIA } from "../controllers/ai-controller.js";
 
 
 const router = Router()
@@ -45,6 +45,12 @@ router.patch('/items/:id/renombrar', verificarTokenJWT, renombrarItem);
 
 router.patch('/items/:id/mover', verificarTokenJWT, moverItem);
 
-router.post('/ai/summarize', verificarTokenJWT, summarizeText);
+router.post('/ia/improve-text', verificarTokenJWT, improveTextIA);
+
+router.put('/files/:id', verificarTokenJWT, actulizarContenidoTextual);
+
+router.get("/ia/recommendations", verificarTokenJWT, obetenerRecomendaciones);
+
+router.post("/share/:id", verificarTokenJWT, shareItem);
 
 export default router;

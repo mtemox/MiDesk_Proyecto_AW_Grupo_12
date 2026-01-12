@@ -4,6 +4,7 @@ import Estudiante from "../models/estudiante.js"
 import { crearTokenJWT } from "../middlewares/JWT.js"
 import mongoose from "mongoose"
 import Item from "../models/item.js";
+import Recommendation from "../models/recomendaciones.js"
 
 
 const registro = async (req,res)=>{
@@ -411,6 +412,97 @@ const moverItem = async (req, res) => {
   }
 };
 
+/**
+ * SB-B-007 
+ */
+const actulizarContenidoTextual = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+    const { id } = req.params;
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ msg: "El contenido es obligatorio" });
+    }
+    const file = await Item.findOne({_id: id,userId,type: { $in: ["note", "code"] }});
+    if (!file) {
+      return res.status(404).json({msg: "Archivo no encontrado o no editable"});
+    }
+    file.content = content;
+    await file.save();
+
+    res.status(200).json({ok: true,msg: "Contenido guardado correctamente"});
+  } catch (error) {
+    res.status(500).json({ msg: "Error guardando contenido" });
+  }
+};
+
+/**
+ * SB-B-009
+ * npm i node-cron
+ */
+const obetenerRecomendaciones = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+
+    const recs = await Recommendation
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    return res.status(200).json({ ok: true, recommendations: recs });
+  } catch (error) {
+    console.error("❌ getRecommendations:", error);
+    return res.status(500).json({ ok: false, msg: "Error en el servidor" });
+  }
+};
+
+const shareItem = async (req,res)=>{
+  try{
+    const ownerId=req.estudianteHeader._id;
+    const {id}=req.params;
+    const {email,permission}=req.body;
+
+    if(!email) return res.status(400).json({msg:"Email requerido"});
+    if(!["read","edit"].includes(permission))
+      return res.status(400).json({msg:"Permiso inválido (read/edit)"});
+
+    const item=await Item.findOne({_id:id,userId:ownerId});
+    if(!item)
+      return res.status(403).json({msg:"No puedes compartir este ítem (no eres propietario)"});
+
+    const invitedUser=await Estudiante.findOne({email});
+    if(!invitedUser)
+      return res.status(404).json({msg:"Usuario invitado no existe"});
+
+    if(String(invitedUser._id)===String(ownerId))
+      return res.status(400).json({msg:"No puedes compartir contigo mismo"});
+
+    const index=item.sharedWith.findIndex(
+      s=>String(s.userId)===String(invitedUser._id)
+    );
+
+    if(index>=0){
+      item.sharedWith[index].permission=permission;
+    }else{
+      item.sharedWith.push({userId:invitedUser._id,permission});
+    }
+
+    await item.save();
+
+    return res.status(200).json({
+      ok:true,
+      msg:"Ítem compartido correctamente",
+      sharedWith:item.sharedWith
+    });
+  }catch(error){
+    console.error("❌ shareItem:",error);
+    return res.status(500).json({msg:"Error en el servidor"});
+  }
+};
+
+
+
 export {
     registro,
     confirmarMail,
@@ -425,7 +517,10 @@ export {
     createItem,
     deleteItem,
     renombrarItem,
-    moverItem
+    moverItem,
+    actulizarContenidoTextual,
+    obetenerRecomendaciones,
+    shareItem
     
     
 }
