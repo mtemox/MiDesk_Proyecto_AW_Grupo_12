@@ -1,15 +1,27 @@
 // src/components/WordEditor.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, 
-  List, ListOrdered, Undo, Redo, Download, Type, Palette, Sparkles
+  List, ListOrdered, Undo, Redo, Download, Type, Palette, Sparkles, Save // <--- AÑADIDO SAVE
 } from 'lucide-react';
+import { toast } from 'react-toastify'; // <--- AÑADIDO
+import { useFetch } from '../hooks/useFetch'; // <--- AÑADIDO
 
-function WordEditor() {
+// AHORA RECIBE PROPS DEL SISTEMA
+function WordEditor({ fileId, fileName, initialContent = "" }) {
   const [fontSize, setFontSize] = useState('16');
   const [textColor, setTextColor] = useState('#000000');
   const editorRef = useRef(null);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
+  
+  const fetchDataBackend = useFetch(); // <--- HOOK PARA BACKEND
+
+  // --- CARGAR CONTENIDO INICIAL ---
+  useEffect(() => {
+    if (editorRef.current && initialContent) {
+      editorRef.current.innerHTML = initialContent;
+    }
+  }, [initialContent]);
 
   // Aplicar formato con execCommand
   const applyFormat = (command, value = null) => {
@@ -20,8 +32,7 @@ function WordEditor() {
   // Cambiar tamaño de fuente
   const changeFontSize = (size) => {
     setFontSize(size);
-    applyFormat('fontSize', '7'); // Truco: usar tamaño 7 de HTML
-    // Luego aplicamos el tamaño real con CSS
+    applyFormat('fontSize', '7'); 
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
@@ -44,50 +55,71 @@ function WordEditor() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'documento.txt';
+    a.download = fileName ? `${fileName}.txt` : 'documento.txt';
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // Mejorar texto con IA de Claude
+  // --- NUEVA FUNCIÓN: GUARDAR EN BACKEND ---
+  const handleSave = async () => {
+    // 1. VALIDACIÓN CRÍTICA: NO GUARDAR SI ES APP DE SISTEMA
+    if (!fileId || fileId.toString().startsWith('sys-')) {
+      toast.info("Este es un editor temporal. Crea un archivo real (Clic derecho -> Nuevo) para guardar.");
+      return;
+    }
+
+    const content = editorRef.current?.innerHTML || ""; // Guardamos con formato HTML
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    try {
+      await fetchDataBackend(
+        `${backendUrl}/files/${fileId}`,
+        { content }, 
+        "PUT",
+        { Authorization: `Bearer ${token}` }
+      );
+      // El hook useFetch ya muestra el mensaje de éxito del backend
+    } catch (error) {
+      console.error("Error guardando:", error);
+    }
+  };
+
+  // --- FUNCIÓN IA CORREGIDA: USAR TU BACKEND ---
   const improveWithAI = async () => {
-    const content = editorRef.current?.innerText || '';
+    const content = editorRef.current?.innerText || ''; // Enviamos solo texto plano a la IA
     
     if (!content.trim()) {
-      alert('Escribe algo primero para que la IA pueda mejorarlo.');
+      toast.warning('Escribe algo primero para que la IA pueda mejorarlo.');
       return;
     }
 
     setIsAIProcessing(true);
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: `Mejora el siguiente texto haciéndolo más claro, profesional y bien estructurado. Mantén el mensaje original pero mejora la redacción, gramática y estilo. Devuelve SOLO el texto mejorado, sin explicaciones adicionales:\n\n${content}`
-            }
-          ]
-        })
-      });
+      // LLAMADA A TU BACKEND (NO A ANTHROPIC DIRECTO)
+      const response = await fetchDataBackend(
+        `${backendUrl}/ia/improve-text`,
+        { text: content }, 
+        "POST",
+        { Authorization: `Bearer ${token}` }
+      );
 
-      const data = await response.json();
-      const improvedText = data.content[0].text;
-
-      // Reemplazar el contenido con el texto mejorado
-      if (editorRef.current) {
-        editorRef.current.innerHTML = improvedText.split('\n').map(p => `<p>${p}</p>`).join('');
+      if (response && response.ok && response.improvedText) {
+        // Insertamos el texto mejorado
+        if (editorRef.current) {
+            // Nota: La IA devuelve texto plano, perdemos formato bold/italic en esta respuesta
+            // pero mantenemos los párrafos.
+            editorRef.current.innerText = response.improvedText;
+            toast.success("¡Texto mejorado por IA!");
+        }
       }
+
     } catch (error) {
       console.error('Error al mejorar con IA:', error);
-      alert('Hubo un error al conectar con la IA. Por favor intenta de nuevo.');
+      // toast.error manejado por useFetch
     } finally {
       setIsAIProcessing(false);
     }
@@ -95,147 +127,142 @@ function WordEditor() {
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white">
-      {/* Barra de Herramientas */}
-      <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-800 border-b border-purple-500/30">
+      {/* Barra de Herramientas - Estilo Windows 11/macOS */}
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2 bg-gradient-to-b from-gray-800 to-gray-850 border-b border-gray-700/50 backdrop-blur-xl">
         
+        {/* --- BOTÓN GUARDAR DESTACADO --- */}
+        <button
+            onClick={handleSave}
+            className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-lg shadow-blue-500/20 transition-all duration-200 hover:scale-105 mr-3 font-medium text-sm"
+            title="Guardar en la Nube"
+        >
+            <Save size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Guardar</span>
+        </button>
+
         {/* Deshacer/Rehacer */}
-        <div className="flex gap-1 border-r border-gray-600 pr-2">
-          <button
-            onClick={() => applyFormat('undo')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+        <div className="flex gap-0.5 mr-2">
+          <button 
+            onClick={() => applyFormat('undo')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Deshacer"
           >
-            <Undo size={18} />
+            <Undo size={16} strokeWidth={2} className="text-gray-300 group-hover:text-white" />
           </button>
-          <button
-            onClick={() => applyFormat('redo')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+          <button 
+            onClick={() => applyFormat('redo')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Rehacer"
           >
-            <Redo size={18} />
+            <Redo size={16} strokeWidth={2} className="text-gray-300 group-hover:text-white" />
           </button>
         </div>
 
-        {/* Formato de Texto */}
-        <div className="flex gap-1 border-r border-gray-600 pr-2">
-          <button
-            onClick={() => applyFormat('bold')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+        {/* Separador Visual */}
+        <div className="h-6 w-px bg-gray-700/50 mx-1"></div>
+
+        {/* Formato Básico */}
+        <div className="flex gap-0.5 mr-2">
+          <button 
+            onClick={() => applyFormat('bold')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Negrita"
           >
-            <Bold size={18} />
+            <Bold size={16} strokeWidth={2.5} className="text-gray-300 group-hover:text-white" />
           </button>
-          <button
-            onClick={() => applyFormat('italic')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+          <button 
+            onClick={() => applyFormat('italic')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Cursiva"
           >
-            <Italic size={18} />
+            <Italic size={16} strokeWidth={2.5} className="text-gray-300 group-hover:text-white" />
           </button>
-          <button
-            onClick={() => applyFormat('underline')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+          <button 
+            onClick={() => applyFormat('underline')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Subrayado"
           >
-            <Underline size={18} />
+            <Underline size={16} strokeWidth={2.5} className="text-gray-300 group-hover:text-white" />
           </button>
         </div>
 
-        {/* Tamaño de Fuente */}
-        <div className="flex items-center gap-2 border-r border-gray-600 pr-2">
-          <Type size={18} />
-          <select
-            value={fontSize}
-            onChange={(e) => changeFontSize(e.target.value)}
-            className="bg-gray-700 text-white px-2 py-1 rounded text-sm"
+        {/* Separador */}
+        <div className="h-6 w-px bg-gray-700/50 mx-1"></div>
+
+        {/* Fuente y Color - Diseño Premium */}
+        <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1 rounded-lg mr-2">
+          <Type size={15} className="text-gray-400" />
+          <select 
+            value={fontSize} 
+            onChange={(e) => changeFontSize(e.target.value)} 
+            className="bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer hover:text-blue-400 transition-colors"
+            style={{ width: '45px' }}
           >
-            <option value="12">12</option>
-            <option value="14">14</option>
-            <option value="16">16</option>
-            <option value="18">18</option>
-            <option value="20">20</option>
-            <option value="24">24</option>
-            <option value="28">28</option>
-            <option value="32">32</option>
+            <option value="12" className="bg-gray-800">12</option>
+            <option value="16" className="bg-gray-800">16</option>
+            <option value="20" className="bg-gray-800">20</option>
+            <option value="24" className="bg-gray-800">24</option>
           </select>
+          
+          <div className="h-4 w-px bg-gray-600 mx-1"></div>
+          
+          <Palette size={15} className="text-gray-400" />
+          <div className="relative">
+            <input 
+              type="color" 
+              value={textColor} 
+              onChange={(e) => changeColor(e.target.value)} 
+              className="w-7 h-7 cursor-pointer rounded-md border-2 border-gray-600 hover:border-blue-400 transition-colors"
+              title="Color de texto"
+            />
+          </div>
         </div>
 
-        {/* Color de Texto */}
-        <div className="flex items-center gap-2 border-r border-gray-600 pr-2">
-          <Palette size={18} />
-          <input
-            type="color"
-            value={textColor}
-            onChange={(e) => changeColor(e.target.value)}
-            className="w-8 h-8 cursor-pointer rounded"
-            title="Color de texto"
-          />
-        </div>
+        {/* Separador */}
+        <div className="h-6 w-px bg-gray-700/50 mx-1"></div>
 
         {/* Alineación */}
-        <div className="flex gap-1 border-r border-gray-600 pr-2">
-          <button
-            onClick={() => applyFormat('justifyLeft')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
-            title="Alinear a la izquierda"
+        <div className="flex gap-0.5 mr-2">
+          <button 
+            onClick={() => applyFormat('justifyLeft')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
+            title="Alinear izquierda"
           >
-            <AlignLeft size={18} />
+            <AlignLeft size={16} strokeWidth={2} className="text-gray-300 group-hover:text-white" />
           </button>
-          <button
-            onClick={() => applyFormat('justifyCenter')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
+          <button 
+            onClick={() => applyFormat('justifyCenter')} 
+            className="p-2 hover:bg-white/10 rounded-lg transition-all duration-150 active:scale-95 group"
             title="Centrar"
           >
-            <AlignCenter size={18} />
-          </button>
-          <button
-            onClick={() => applyFormat('justifyRight')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
-            title="Alinear a la derecha"
-          >
-            <AlignRight size={18} />
+            <AlignCenter size={16} strokeWidth={2} className="text-gray-300 group-hover:text-white" />
           </button>
         </div>
 
-        {/* Listas */}
-        <div className="flex gap-1 border-r border-gray-600 pr-2">
-          <button
-            onClick={() => applyFormat('insertUnorderedList')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
-            title="Lista con viñetas"
-          >
-            <List size={18} />
-          </button>
-          <button
-            onClick={() => applyFormat('insertOrderedList')}
-            className="p-2 hover:bg-gray-700 rounded transition-colors"
-            title="Lista numerada"
-          >
-            <ListOrdered size={18} />
-          </button>
-        </div>
+        <div className="flex-1"></div>
 
-        {/* Botón de IA */}
+        {/* Botón de IA - Diseño Futurista */}
         <button
           onClick={improveWithAI}
           disabled={isAIProcessing}
-          className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 
-                   disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-medium text-sm shadow-lg transition-all duration-200 mr-2
+            ${isAIProcessing 
+              ? 'bg-gradient-to-r from-purple-600/50 to-pink-600/50 text-gray-400 cursor-wait' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white hover:scale-105 shadow-purple-500/30'
+            }`}
           title="Mejorar con IA"
         >
-          <Sparkles size={18} />
-          {isAIProcessing ? 'Mejorando...' : 'Mejorar con IA'}
+          <Sparkles size={16} strokeWidth={2.5} className={isAIProcessing ? 'animate-pulse' : ''} />
+          <span>{isAIProcessing ? 'Procesando...' : 'IA'}</span>
         </button>
 
         {/* Exportar */}
-        <button
-          onClick={exportToText}
-          className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 
-                   rounded transition-colors ml-auto"
-          title="Exportar a TXT"
+        <button 
+          onClick={exportToText} 
+          className="p-2 hover:bg-emerald-600/20 rounded-lg transition-all duration-150 active:scale-95 group" 
+          title="Descargar"
         >
-          <Download size={18} />
-          Exportar
+          <Download size={16} strokeWidth={2.5} className="text-emerald-400 group-hover:text-emerald-300" />
         </button>
       </div>
 
@@ -244,16 +271,15 @@ function WordEditor() {
         ref={editorRef}
         contentEditable
         className="flex-1 p-6 overflow-auto focus:outline-none bg-white text-gray-900"
-        style={{
-          minHeight: '100%',
-          fontSize: `${fontSize}px`,
-          lineHeight: '1.6'
-        }}
+        style={{ minHeight: '100%', fontSize: `${fontSize}px`, lineHeight: '1.6' }}
         suppressContentEditableWarning
       >
-        <p>Empieza a escribir tu documento aquí...</p>
-        <p>Usa la barra de herramientas para dar formato a tu texto.</p>
-        <p>¡Haz clic en "Mejorar con IA" para que Claude mejore tu redacción!</p>
+        {/* El contenido inicial se carga vía useEffect */}
+      </div>
+      
+      {/* Barra de estado */}
+      <div className="px-4 py-1 bg-gray-800 text-[10px] text-gray-500 flex justify-between">
+        <span>{fileId && !fileId.toString().startsWith('sys-') ? `Editando: ${fileName}` : 'Modo borrador (Sin guardar)'}</span>
       </div>
     </div>
   );

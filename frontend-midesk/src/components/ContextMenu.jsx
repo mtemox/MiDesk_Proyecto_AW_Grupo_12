@@ -1,8 +1,8 @@
 // src/components/ContextMenu.jsx
 import React from 'react';
-import { Trash2, Link as LinkIcon, FolderPlus } from 'lucide-react'; // Íconos opcionales
+import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode } from 'lucide-react'; // Íconos opcionales
 
-function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, selectedItem, onDelete }) {
+function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, selectedItem, onDelete }) {
   
   if (!isVisible) return null;
 
@@ -23,6 +23,22 @@ function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, selectedItem, on
            onClick={onNewFolder} // <--- AQUI ESTABA EL PROBLEMA (Faltaba esto)
         >
            <FolderPlus size={14} /> Nueva Carpeta
+        </li>
+
+        {/* --- NUEVA OPCIÓN: NUEVA NOTA (SIN FORMULARIO) --- */}
+        <li 
+           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
+           onClick={onNewNote} // <--- LLAMADA A LA FUNCIÓN
+        >
+           <FileText size={14} /> Nueva Nota
+        </li>
+
+        {/* --- NUEVA OPCIÓN: NUEVO CÓDIGO --- */}
+        <li 
+           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
+           onClick={onNewCode} // <--- LLAMADA A LA FUNCIÓN
+        >
+           <FileCode size={14} /> Nuevo Código
         </li>
         
         <li 

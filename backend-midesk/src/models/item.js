@@ -24,6 +24,12 @@ const itemSchema = new Schema(
       trim: true,
     },
 
+    // Contenido de texto
+    content: {
+      type: String,
+      default: "" // Por defecto vacío
+    },
+
     // Solo para enlaces
     url: {
       type: String,

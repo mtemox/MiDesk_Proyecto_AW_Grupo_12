@@ -1,38 +1,40 @@
 // src/components/Desktop.jsx
 
-import React, { useState, useEffect } from 'react'; // <-- PASO 1
-import { toast } from 'react-toastify'; // Para notificaciones
-import { useFetch } from '../hooks/useFetch'; // Hook de conexión
+import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify'; 
+import { useFetch } from '../hooks/useFetch';
 
 // Componentes UI
 import AppWindow from './AppWindow';
 import ContextMenu from './ContextMenu';
 import Icon from './Icon'; 
-import Modal from './Modal'; // <-- NUEVO: Importar Modal
-import NewLinkForm from './NewLinkForm'; // <-- NUEVO: Importar Formulario
+import Modal from './Modal'; // Importar Modal
+import NewLinkForm from './NewLinkForm'; 
 import FolderContent from './FolderContent';
 import NewFolderForm from './NewFolderForm';
 
 // Widgets y Apps
-import CodeEditor from './CodeEditor'; // <-- NUEVO
-import CodeComparator from './DiffEditor'; // <-- NUEVO
+import CodeEditor from './CodeEditor';
+import CodeComparator from './DiffEditor';
 import WeatherWidget from './widgets/WeatherWidget';
 import NewsWidget from './widgets/NewsWidget';
 import WallpaperWidget from './widgets/WallpaperWidget';
 import WordEditor from './WordEditor';
 import ProfileApp from './apps/ProfileApp';
+import RecommendationsWidget from './widgets/RecommendationsWidget';
 
-// --- IMÁGENES E ÍCONOS ---
-import codeIcon from '../assets/icons/code.png'; // (Deberás conseguir esta imagen)
-import weatherIcon from '../assets/icons/weather.png'; // (Necesitarás un icono de clima)
+// Imágenes e Íconos
+import codeIcon from '../assets/icons/code.png'; 
+import weatherIcon from '../assets/icons/weather.png'; 
 import newsIcon from '../assets/icons/news.png';
-import noteIcon from '../assets/icons/note.png'; // (Deberás conseguir esta imagen)
-import wallpaperIcon from '../assets/icons/wallpaper.png'; // (Necesitarás un icono)
+import noteIcon from '../assets/icons/note.png'; 
+import wallpaperIcon from '../assets/icons/wallpaper.png'; 
 import backgroundImageUrl from '../assets/wallpapers/mi-fondo.jpg';
 import folderIcon from '../assets/icons/folder.png';
 import computerIcon from '../assets/icons/desktop.png';
-import linkIcon from '../assets/icons/link.png'; // <-- Añadimos un icono de enlace para SB-F-005
+import linkIcon from '../assets/icons/link.png'; 
 import wordIcon from '../assets/icons/doc.png';
+import aiIcon from '../assets/icons/chat.png';
 
 
 // --- SIMULACIÓN DE DATOS DEL BACKEND ---
@@ -40,6 +42,9 @@ import wordIcon from '../assets/icons/doc.png';
 // Traemos las imágenes que ya tenías
 
 const systemAppsBase = [
+  { _id: 'sys-8', nombre: 'Asistente IA', imgSrc: aiIcon, type: 'app', appId: 'ai-recommendations' },
+  { _id: 'sys-7', nombre: 'Bloc de Notas', imgSrc: noteIcon, type: 'app', appId: 'notepad' },
+  
   { _id: 'sys-6', nombre: 'Mi Equipo', imgSrc: computerIcon, type: 'computer' },
   { _id: 'sys-5', nombre: 'VS Code (Sim)', imgSrc: codeIcon, type: 'app', appId: 'codeEditor' },
   { _id: 'sys-4', nombre: 'Word Pro', imgSrc: wordIcon, type: 'app', appId: 'wordprocessor' },
@@ -53,7 +58,7 @@ const getIconImage = (type) => {
     switch (type) {
         case 'folder': return folderIcon;
         case 'link': return linkIcon;
-        case 'note': return noteIcon;
+        case 'note': return wordIcon;
         case 'code': return codeIcon;
         default: return linkIcon;
     }
@@ -135,7 +140,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             imgSrc: getIconImage(item.type),
             type: item.type,
             url: item.url,
-            position: item.position // Estos ya traen su posición de la BD
+            position: item.position, // Estos ya traen su posición de la BD
+            content: item.content || ""
           }));
 
           // Mezclamos: Apps de sistema calculadas + Items de usuario
@@ -340,6 +346,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         y: 100
     };
 
+  
+
     try {
         const response = await fetchDataBackend(
             `${backendUrl}/items`,
@@ -464,10 +472,21 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         );
 
       case 'notepad':
+      case 'note': 
+        return (
+          <WordEditor 
+            fileId={data?._id} 
+            fileName={data?.nombre}
+            initialContent={data?.content} // El backend lo envía si el endpoint está bien
+          />
+        );
+      
+      case 'code': 
         return (
           <CodeEditor 
-            language="plaintext" 
-            initialValue="Escribe tus notas aquí...\n\nPuedes pedirle a la IA que mejore esto."
+            fileId={data?._id} 
+            fileName={data?.nombre}
+            initialContent={data?.content} 
           />
         );
         
@@ -508,17 +527,112 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       
       case 'profile': 
           return <ProfileApp />; // 👈 NUEVO
+      
+      case 'ai-recommendations': // <--- NUEVO CASE
+       return <RecommendationsWidget />;
 
-      case 'notepad': 
-          return <CodeEditor language="plaintext" initialValue="Notas..." />;
-          
-        default:
-          return <div className="text-white p-4">App no encontrada</div>;
-        }
+      default:
+        return <div className="text-white p-4">App no encontrada</div>;
+      }
 
   };
 
-  
+  const handleCreateQuickNote = async () => {
+    handleCloseMenu(); // Cerramos el menú
+    
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    // Usamos las coordenadas del menú contextual (donde hiciste clic)
+    // O un default si no están disponibles
+    const posX = menuState.x > 0 ? menuState.x - 50 : 100;
+    const posY = menuState.y > 0 ? menuState.y - 50 : 100;
+
+    const newItemData = {
+        type: 'note',        // Tipo Nota
+        name: 'Nueva Nota',  // Nombre por defecto
+        url: null,
+        x: posX,
+        y: posY
+    };
+
+    try {
+        const response = await fetchDataBackend(
+            `${backendUrl}/items`,
+            newItemData,
+            "POST",
+            { Authorization: `Bearer ${token}` }
+        );
+
+        if (response && response.ok) {
+            const createdItem = response.item;
+            
+            // Creamos el objeto para la UI
+            const newIconUI = {
+                _id: createdItem._id,
+                nombre: createdItem.name,
+                imgSrc: getIconImage('note'), // Asegúrate que 'note' devuelva tu icono de nota
+                type: 'note',
+                url: null,
+                content: "", // Contenido vacío al inicio
+                position: { x: posX, y: posY }
+            };
+
+            setIcons(prev => [...prev, newIconUI]);
+            toast.success("Nota creada. Haz clic en el nombre para renombrar.");
+        }
+    } catch (error) {
+        console.error("Error creando nota rápida:", error);
+    }
+  };
+
+  // --- NUEVA FUNCIÓN: CREAR ARCHIVO DE CÓDIGO ---
+  const handleCreateQuickCode = async () => {
+    handleCloseMenu();
+    
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    // Posición donde hiciste clic
+    const posX = menuState.x > 0 ? menuState.x - 50 : 120;
+    const posY = menuState.y > 0 ? menuState.y - 50 : 120;
+
+    const newItemData = {
+        type: 'code',           // <--- TIPO CODE
+        name: 'script.js',      // Nombre por defecto
+        url: null,
+        x: posX,
+        y: posY
+    };
+
+    try {
+        const response = await fetchDataBackend(
+            `${backendUrl}/items`,
+            newItemData,
+            "POST",
+            { Authorization: `Bearer ${token}` }
+        );
+
+        if (response && response.ok) {
+            const createdItem = response.item;
+            
+            const newIconUI = {
+                _id: createdItem._id,
+                nombre: createdItem.name,
+                imgSrc: getIconImage('code'), // Usará el ícono de código
+                type: 'code',
+                url: null,
+                content: "", 
+                position: { x: posX, y: posY }
+            };
+
+            setIcons(prev => [...prev, newIconUI]);
+            toast.success("Archivo de código creado.");
+        }
+    } catch (error) {
+        console.error("Error creando código:", error);
+    }
+  };
 
 
   return (
@@ -553,6 +667,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         selectedItem={menuState.selectedItem}
         onNewLink={handleOpenNewLinkModal}
         onNewFolder={handleOpenNewFolderModal}
+        onNewNote={handleCreateQuickNote}
+        onNewCode={handleCreateQuickCode}
         onDelete={handleDeleteItem}
       />
 
