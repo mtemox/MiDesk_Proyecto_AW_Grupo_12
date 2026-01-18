@@ -1,6 +1,6 @@
 import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
-moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem  } from '../controllers/estudiante-controller.js';
+moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias  } from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
 import { improveTextIA } from "../controllers/ai-controller.js";
@@ -38,12 +38,12 @@ router.get("/desktop", verificarTokenJWT, getDesktop);
 // Crear un nuevo ítem
 router.post("/items", verificarTokenJWT, createItem);
 
-//ID= de la carpeta que quieras eliminar 
-router.delete('/items/:id', verificarTokenJWT, deleteItem);
-
 router.patch('/items/:id/renombrar', verificarTokenJWT, renombrarItem);
 
 router.patch('/items/:id/mover', verificarTokenJWT, moverItem);
+
+//ID= de la carpeta que quieras eliminar 
+router.delete('/items/:id', verificarTokenJWT, deleteItem);
 
 router.post('/ia/improve-text', verificarTokenJWT, improveTextIA);
 
@@ -52,5 +52,9 @@ router.put('/files/:id', verificarTokenJWT, actulizarContenidoTextual);
 router.get("/ia/recommendations", verificarTokenJWT, obetenerRecomendaciones);
 
 router.post("/share/:id", verificarTokenJWT, shareItem);
+
+router.patch("/user/preferences",verificarTokenJWT,actuPreferencias);
+
+router.post("/upload/image",verificarTokenJWT,actualizarImagen);
 
 export default router;

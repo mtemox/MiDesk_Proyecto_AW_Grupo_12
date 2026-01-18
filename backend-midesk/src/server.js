@@ -15,6 +15,7 @@ dotenv.config();
 
 
 
+
 // Configuraciones
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -31,9 +32,6 @@ app.use(fileUpload({
     useTempFiles : true,
     tempFileDir : './uploads'
 }))
-
-app.use(express.json());
-app.use(cors());
 
 // Variables de entorno o variables globales
 app.set('port', process.env.PORT || 3000);
@@ -61,3 +59,4 @@ app.use((req,res)=>{
 // Exportar la instancia express por medio de app
 
 export default app;
+

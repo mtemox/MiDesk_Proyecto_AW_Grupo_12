@@ -5,7 +5,8 @@ import { crearTokenJWT } from "../middlewares/JWT.js"
 import mongoose from "mongoose"
 import Item from "../models/item.js";
 import Recommendation from "../models/recomendaciones.js"
-
+import fs from "fs";
+import {subirImagenCloudinary} from "../helpers/uploadCloudinary.js"
 
 const registro = async (req,res)=>{
 
@@ -245,22 +246,14 @@ const createItem = async (req, res) => {
     const userId = req.estudianteHeader._id;
     const { type, name, url, parentId, x, y } = req.body;
 
-    
     console.log("👉 createItem userId:", userId);
     console.log("👉 createItem body:", req.body);
 
-    // Validaciones básicas
-    if (!type || !name) {
-      return res
-        .status(400)
-        .json({ ok: false, msg: "Tipo y nombre son obligatorios" });
-    }
+    if (!type || !name)
+      return res.status(400).json({ ok: false, msg: "Tipo y nombre son obligatorios" });
 
-    if (type === "link" && !url) {
-      return res
-        .status(400)
-        .json({ ok: false, msg: "La URL es obligatoria para enlaces" });
-    }
+    if (type === "link" && !url)
+      return res.status(400).json({ ok: false, msg: "La URL es obligatoria para enlaces" });
 
     const newItem = new Item({
       userId,
@@ -268,147 +261,130 @@ const createItem = async (req, res) => {
       name,
       url: url || null,
       parentId: parentId || null,
-      position: {
-        x: x ?? 100,
-        y: y ?? 100,
-      },
+      position: { x: x ?? 100, y: y ?? 100 }
     });
 
     await newItem.save();
 
+    // ✅ SOCKET.IO EVENT
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user:${userId}`).emit("item-created", newItem);
+
+      // Si este item tiene compartidos (en el futuro)
+      if (newItem.sharedWith && newItem.sharedWith.length > 0) {
+        newItem.sharedWith.forEach(s => {
+          io.to(`user:${s.userId}`).emit("item-created", newItem);
+        });
+      }
+    }
+
     return res.status(201).json({
       ok: true,
       msg: "Ítem creado exitosamente",
-      item: newItem,
+      item: newItem
     });
+
   } catch (error) {
     console.error("❌ Error en createItem:", error);
-    return res
-      .status(500)
-      .json({ ok: false, msg: `Error en el servidor - ${error}` });
+    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
   }
 };
 
-const deleteItem = async (req, res) => {
-  try {
-    const userId = req.estudianteHeader._id;
-    const { id } = req.params;
 
-    // 1. Buscar el ítem principal
-    const item = await Item.findOne({ _id: id, userId });
-    if (!item) {
-      return res.status(404).json({
-        ok: false,
-        msg: "No existe este ítem o no pertenece al usuario"
-      });
+
+const renombrarItem=async(req,res)=>{
+  try{
+    const userId=req.estudianteHeader._id;
+    const {id}=req.params;
+    const {name}=req.body;
+
+    console.log("✅ ENTRO renombrarItem", {id:String(id), userId:String(userId), name});
+
+    if(!name||!String(name).trim()){
+      return res.status(400).json({ok:false,msg:"El nombre es obligatorio"});
     }
 
-    // 2. Función recursiva para eliminar hijos
-    const deleteChildren = async (parentId) => {
-      const children = await Item.find({ parentId, userId });
+    const item=await Item.findOneAndUpdate(
+      {_id:id,userId},
+      {name:String(name).trim()},
+      {new:true}
+    );
 
-      for (const child of children) {
-        await deleteChildren(child._id); // Eliminar subhijos
-        await Item.findByIdAndDelete(child._id);
+    if(!item){
+      console.log("❌ renombrarItem: item no encontrado o no pertenece");
+      return res.status(404).json({ok:false,msg:"Ítem no encontrado o no pertenece al usuario"});
+    }
+
+    const io=req.app.get("io");
+    console.log("🔎 io existe?:", Boolean(io));
+
+    if(io){
+      const payload={id:item._id,name:item.name,parentId:item.parentId,position:item.position,type:item.type};
+      console.log("📢 EMIT item-renamed to", `user:${String(userId)}`, payload);
+
+      io.to(`user:${userId}`).emit("item-renamed",payload);
+
+      if(item.sharedWith?.length){
+        item.sharedWith.forEach(s=>io.to(`user:${s.userId}`).emit("item-renamed",payload));
       }
-    };
-
-    // 3. Eliminar todos los hijos primero
-    await deleteChildren(item._id);
-
-    // 4. Eliminar el ítem principal
-    await Item.findByIdAndDelete(item._id);
-
-    return res.status(200).json({
-      ok: true,
-      msg: "Ítem eliminado correctamente"
-    });
-
-  } catch (error) {
-    console.error("Error eliminando ítem:", error);
-    return res.status(500).json({
-      ok: false,
-      msg: `Error en el servidor - ${error}`
-    });
-  }
-};
-
-const renombrarItem = async (req, res) => {
-  try {
-    const userId = req.estudianteHeader._id;
-    const { id } = req.params;
-    const { name } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ ok: false, msg: "El nombre es obligatorio" });
     }
 
-    const item = await Item.findOneAndUpdate(
-      { _id: id, userId },     
-      { name },
-      { new: true }
-    );
-
-    if (!item) {
-      return res.status(404).json({
-        ok: false,
-        msg: "Ítem no encontrado o no pertenece al usuario"
-      });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      msg: "Ítem renombrado correctamente",
-      item
-    });
-
-  } catch (error) {
-    console.error("Error en renameItem:", error);
-    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+    return res.status(200).json({ok:true,msg:"Ítem renombrado correctamente",item});
+  }catch(error){
+    console.error("❌ renombrarItem:",error);
+    return res.status(500).json({ok:false,msg:`Error en el servidor - ${error.message}`});
   }
 };
 
 
 
-const moverItem = async (req, res) => {
-  try {
-    const userId = req.estudianteHeader._id;
-    const { id } = req.params;
-    const { parentId, x, y } = req.body;
+const moverItem=async(req,res)=>{
+  try{
+    const userId=req.estudianteHeader._id;
+    const {id}=req.params;
+    const {x,y,parentId}=req.body;
 
-    const updateData = {
-      parentId: parentId ?? null
-    };
-
-    if (x !== undefined || y !== undefined) {
-      updateData.position = {
-        x: x ?? 100,
-        y: y ?? 100
-      };
+    // validación: al menos algo para actualizar
+    if(x===undefined&&y===undefined&&parentId===undefined){
+      return res.status(400).json({ok:false,msg:"Debes enviar x, y o parentId"});
     }
 
-    const item = await Item.findOneAndUpdate(
-      { _id: id, userId },     // validar propietario
-      updateData,
-      { new: true }
-    );
+    const item=await Item.findOne({_id:id,userId});
+    if(!item) return res.status(404).json({ok:false,msg:"Ítem no encontrado o no pertenece al usuario"});
 
-    if (!item) {
-      return res.status(404).json({
-        ok: false,
-        msg: "Ítem no encontrado o no pertenece al usuario"
-      });
+    if(x!==undefined){
+      const nx=Number(x);
+      if(Number.isNaN(nx)) return res.status(400).json({ok:false,msg:"x debe ser número"});
+      item.position.x=nx;
     }
 
-    return res.status(200).json({
-      ok: true,
-      msg: "Ítem movido correctamente",
-      item
-    });
+    if(y!==undefined){
+      const ny=Number(y);
+      if(Number.isNaN(ny)) return res.status(400).json({ok:false,msg:"y debe ser número"});
+      item.position.y=ny;
+    }
 
-  } catch (error) {
-    console.error("Error en moveItem:", error);
-    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+    if(parentId!==undefined){
+      // permitir null para mover a raíz
+      item.parentId=parentId?parentId:null;
+    }
+
+    await item.save();
+
+    const io=req.app.get("io");
+    if(io){
+      const payload={id:item._id,position:item.position,parentId:item.parentId};
+      io.to(`user:${userId}`).emit("item-moved",payload);
+      if(item.sharedWith?.length){
+        item.sharedWith.forEach(s=>io.to(`user:${s.userId}`).emit("item-moved",payload));
+      }
+    }
+
+    return res.status(200).json({ok:true,msg:"Ítem movido correctamente",item});
+  }catch(error){
+    console.error("❌ moverItem:",error);
+    return res.status(500).json({ok:false,msg:`Error en el servidor - ${error.message}`});
   }
 };
 
@@ -433,6 +409,63 @@ const actulizarContenidoTextual = async (req, res) => {
     res.status(200).json({ok: true,msg: "Contenido guardado correctamente"});
   } catch (error) {
     res.status(500).json({ msg: "Error guardando contenido" });
+  }
+};
+
+const deleteItem = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+    const { id } = req.params;
+
+    console.log("🧨 deleteItem id:", id, "userId:", userId);
+
+    const root = await Item.findOne({ _id: id, userId }).lean();
+    if (!root) return res.status(404).json({ ok:false, msg:"No existe este ítem o no pertenece al usuario" });
+
+    // ✅ Recolectar IDs a borrar (BFS) evitando ciclos
+    const toDelete = new Set([String(id)]);
+    const queue = [id];
+    let guard = 0;
+
+    while (queue.length) {
+      guard++;
+      if (guard > 5000) {
+        return res.status(400).json({ ok:false, msg:"Árbol demasiado grande o ciclo detectado" });
+      }
+
+      const parentId = queue.shift();
+
+      const children = await Item.find({ parentId, userId }).select("_id").lean();
+      for (const ch of children) {
+        const chId = String(ch._id);
+        if (!toDelete.has(chId)) {
+          toDelete.add(chId);
+          queue.push(ch._id);
+        }
+      }
+    }
+
+    const idsArray = Array.from(toDelete);
+    console.log("🧨 Total a borrar:", idsArray.length);
+
+    await Item.deleteMany({ _id: { $in: idsArray }, userId });
+
+    // ✅ SOCKET.IO EVENT
+    const io=req.app.get("io");
+    if(io){
+      io.to(`user:${userId}`).emit("item-deleted",{id,deleted:idsArray.length,ids:idsArray});
+      // Si este item tenía compartidos (en el futuro), notifica a invitados
+      if(root.sharedWith&&root.sharedWith.length>0){
+        root.sharedWith.forEach(s=>{
+          io.to(`user:${s.userId}`).emit("item-deleted",{id,deleted:idsArray.length,ids:idsArray});
+        });
+      }
+    }
+
+    return res.status(200).json({ ok:true, msg:"Ítem eliminado correctamente", deleted: idsArray.length });
+  } catch (error) {
+    console.error("❌ deleteItem:", error);
+    return res.status(500).json({ ok:false, msg:`Error en el servidor - ${error.message}` });
   }
 };
 
@@ -501,6 +534,80 @@ const shareItem = async (req,res)=>{
   }
 };
 
+const actuPreferencias=async(req,res)=>{
+  try{
+    const userId=req.estudianteHeader._id;
+    const {theme}=req.body;
+
+    if(theme&&!["light","dark"].includes(theme)){
+      return res.status(400).json({ok:false,msg:"theme inválido (light/dark)"});
+    }
+
+    const estudiante=await Estudiante.findById(userId);
+    if(!estudiante) return res.status(404).json({ok:false,msg:"Usuario no encontrado"});
+
+    if(theme) estudiante.preferences.theme=theme;
+
+    await estudiante.save();
+
+    const io=req.app.get("io");
+    if(io) io.to(`user:${userId}`).emit("preferences-updated",{theme:estudiante.preferences.theme});
+
+    return res.status(200).json({ok:true,msg:"Preferencias actualizadas",preferences:estudiante.preferences});
+  }catch(error){
+    console.error("❌ updatePreferences:",error);
+    return res.status(500).json({ok:false,msg:`Error en el servidor - ${error.message}`});
+  }
+};
+
+const actualizarImagen = async (req, res) => {
+  try {
+    const userId = req.estudianteHeader._id;
+
+    // ✅ validar archivo en campo "image"
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({
+        ok: false,
+        msg: "Debes enviar un archivo en el campo 'image'",
+      });
+    }
+
+    const file = req.files.image;
+
+    // ✅ express-fileupload con useTempFiles:true genera tempFilePath
+    if (!file.tempFilePath) {
+      return res.status(400).json({
+        ok: false,
+        msg: "tempFilePath no existe. Revisa express-fileupload (useTempFiles:true)",
+      });
+    }
+
+    // ✅ subir a Cloudinary
+    const { secure_url, public_id } = await subirImagenCloudinary(file.tempFilePath, "VirtualDesk");
+
+    // ✅ guardar en BD (aunque no exista preferences)
+    const estudiante = await Estudiante.findByIdAndUpdate(
+      userId,
+      { $set: { "preferences.wallpaperUrl": secure_url } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      ok: true,
+      msg: "Imagen subida correctamente",
+      wallpaperUrl: secure_url,
+      publicId: public_id,
+      preferences: estudiante?.preferences || { wallpaperUrl: secure_url },
+    });
+  } catch (error) {
+    console.error("❌ subirImagen:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error en el servidor",
+      error: error?.message || String(error),
+    });
+  }
+};
 
 
 export {
@@ -520,7 +627,8 @@ export {
     moverItem,
     actulizarContenidoTextual,
     obetenerRecomendaciones,
-    shareItem
-    
-    
+    shareItem,
+    actuPreferencias,
+    actualizarImagen
 }
+
