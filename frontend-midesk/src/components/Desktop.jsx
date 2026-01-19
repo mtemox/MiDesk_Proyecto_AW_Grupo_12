@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify'; 
 import { useFetch } from '../hooks/useFetch';
+import { useSocket } from '../context/SocketContext';
+import { useSearchParams } from 'react-router-dom';
+import ShareForm from './ShareForm';
 
 // Componentes UI
 import AppWindow from './AppWindow';
@@ -22,6 +25,7 @@ import WallpaperWidget from './widgets/WallpaperWidget';
 import WordEditor from './WordEditor';
 import ProfileApp from './apps/ProfileApp';
 import RecommendationsWidget from './widgets/RecommendationsWidget';
+import SettingsApp from './apps/SettingsApp';
 
 // Imágenes e Íconos
 import codeIcon from '../assets/icons/code.png'; 
@@ -30,6 +34,7 @@ import newsIcon from '../assets/icons/news.png';
 import noteIcon from '../assets/icons/note.png'; 
 import wallpaperIcon from '../assets/icons/wallpaper.png'; 
 import backgroundImageUrl from '../assets/wallpapers/mi-fondo.jpg';
+import defaultWallpaper from '../assets/wallpapers/mi-fondo.jpg';
 import folderIcon from '../assets/icons/folder.png';
 import computerIcon from '../assets/icons/desktop.png';
 import linkIcon from '../assets/icons/link.png'; 
@@ -65,10 +70,22 @@ const getIconImage = (type) => {
 };
 
 
-function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMinimizeWindow, onMaximizeWindow }) {
+function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMinimizeWindow, onMaximizeWindow, onDragStop }) {
   
   // PASO 2: Crear el estado para los íconos
-  const [icons, setIcons] = useState([]);
+  const [icons, setIcons] = useState([])
+
+  const [currentWallpaper, setCurrentWallpaper] = useState(defaultWallpaper);
+  
+  // Socket
+  const { socket } = useSocket();
+  const [searchParams] = useSearchParams();
+  const remoteId = searchParams.get('remote');
+
+  // DETECTAR MODO REMOTO
+  const remoteUserId = searchParams.get('remote');
+  const remoteUserName = searchParams.get('name');
+  const isRemote = !!remoteUserId; // Booleano
 
   // --- CONFIGURACIÓN DE LA REJILLA ---
   const CELL_WIDTH = 100;
@@ -127,22 +144,38 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       // 2. Cargar items del usuario desde el Backend
       const token = localStorage.getItem('token');
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
-      
+
       try {
-        const data = await fetchDataBackend(`${backendUrl}/desktop`, null, "GET", {
-          Authorization: `Bearer ${token}`
-        });
+        // Limpiamos espacios o caracteres raros
+         const cleanRemoteId = remoteId ? remoteId.trim() : null;
+         
+         // Construimos la URL con cuidado
+         // Si hay ID remoto, usamos ?remoteUserId=... sino cadena vacía
+         const queryString = cleanRemoteId ? `?remoteUserId=${cleanRemoteId}` : '';
+         
+         // Eliminamos posible doble slash si backendUrl termina en /
+         const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
+         const finalUrl = `${baseUrl}/desktop${queryString}`;
+
+         console.log("🚀 Enviando petición a:", finalUrl);
+
+         const data = await fetchDataBackend(
+            finalUrl, 
+            null, 
+            "GET", 
+            { Authorization: `Bearer ${token}` }
+         );
 
         if (data && data.ok) {
           const userItems = data.items.map(item => ({
-            _id: item._id,
-            nombre: item.name,
-            imgSrc: getIconImage(item.type),
-            type: item.type,
-            url: item.url,
-            position: item.position, // Estos ya traen su posición de la BD
-            content: item.content || ""
-          }));
+             _id: item._id,
+             nombre: item.name,
+             imgSrc: getIconImage(item.type),
+             type: item.type,
+             url: item.url,
+             position: item.position,
+             content: item.content || ""
+           }));
 
           // Mezclamos: Apps de sistema calculadas + Items de usuario
           setIcons([...positionedSystemApps, ...userItems]);
@@ -154,6 +187,99 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
     loadEverything();
 
+    // --- AQUÍ EMPIEZA LA LÓGICA NUEVA DE WEB SOCKETS ---
+    if (socket) {
+
+      if (isRemote) {
+            console.log("🔭 Modo Remoto: Conectando a sala de", remoteUserId);
+            socket.emit('join-user-room', remoteUserId);
+        }
+      
+      // A. Escuchar cuando se CREA un ítem (por otro usuario o por mí en otra pestaña)
+      socket.on('item-created', (newItem) => {
+        console.log("📡 Socket: item-created", newItem);
+        
+        // Formateamos el ítem que llega del socket para que coincida con nuestra UI
+        const newIconUI = {
+            _id: newItem._id,
+            nombre: newItem.name,
+            imgSrc: getIconImage(newItem.type),
+            type: newItem.type,
+            url: newItem.url,
+            position: newItem.position || { x: 100, y: 100 },
+            content: newItem.content || ""
+        };
+
+        // Lo agregamos al estado si no existe ya
+        setIcons(prev => {
+            if (prev.find(i => i._id === newItem._id)) return prev;
+            return [...prev, newIconUI];
+        });
+      });
+
+      // B. Escuchar cuando se MUEVE un ítem
+      socket.on('item-moved', ({ id, position }) => {
+        console.log("📡 Socket: item-moved", id, position);
+        setIcons(prev => prev.map(icon => 
+            icon._id === id ? { ...icon, position } : icon
+        ));
+      });
+
+      // C. Escuchar cuando se RENOMBRA un ítem
+      socket.on('item-renamed', ({ id, name }) => {
+         console.log("📡 Socket: item-renamed", id, name);
+         setIcons(prev => prev.map(icon => 
+            icon._id === id ? { ...icon, nombre: name } : icon
+         ));
+      });
+
+      // D. Escuchar cuando se ELIMINA un ítem (o varios)
+      socket.on('item-deleted', ({ ids }) => {
+        console.log("📡 Socket: item-deleted", ids);
+        // Filtramos fuera los iconos que estén en la lista de IDs eliminados
+        setIcons(prev => prev.filter(icon => !ids.includes(icon._id)));
+      });
+
+      // E. Escuchar cuando alguien me comparte algo
+      socket.on('item-shared', (sharedItem) => {
+        console.log("🎁 ¡Me compartieron algo!", sharedItem);
+        toast.info(`Te han compartido: ${sharedItem.name}`);
+
+        // Lo formateamos para la UI
+        const newIconUI = {
+            _id: sharedItem._id,
+            nombre: sharedItem.name,
+            imgSrc: getIconImage(sharedItem.type),
+            type: sharedItem.type,
+            url: sharedItem.url,
+            position: { x: 50, y: 50 }, // Lo ponemos en la esquina por defecto
+            content: sharedItem.content || "",
+            // Podrías añadir un flag visual para saber que es compartido
+            isShared: true 
+        };
+
+        setIcons(prev => {
+             // Evitar duplicados
+             if (prev.find(i => i._id === sharedItem._id)) return prev;
+             return [...prev, newIconUI];
+        });
+      });
+
+      // F. Escuchar cambios de preferencias (Tema/Fondo)
+        socket.on('preferences-updated', (prefs) => {
+            console.log("🎨 Preferencias actualizadas remotamente:", prefs);
+            if (prefs.wallpaperUrl) {
+                setCurrentWallpaper(prefs.wallpaperUrl);
+            }
+            // Si quieres manejar el tema oscuro aquí también:
+            // if (prefs.theme) ...
+        });
+
+
+    }
+
+    
+
     // Opcional: Recalcular si el usuario cambia el tamaño de la ventana
     const handleResize = () => {
       setIcons(prev => {
@@ -164,7 +290,52 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Limpieza de eventos al desmontar
+    return () => {
+       window.removeEventListener('resize', () => {}); // Tu resize existente
+       
+       if (socket && isRemote) {
+             const myUser = JSON.parse(localStorage.getItem('user'));
+             socket.emit('join-user-room', myUser.id); // Volver a mi sala
+        }
+       
+       if (socket) {
+         socket.off('item-created');
+         socket.off('item-moved');
+         socket.off('item-renamed');
+         socket.off('item-deleted');
+         socket.off('item-shared');
+       }
+    };
+
+  }, [socket, remoteUserId]);
+
+  // 2. USE EFFECT PARA CARGAR PREFERENCIAS Y ESCUCHAR CAMBIOS
+  useEffect(() => {
+     const token = localStorage.getItem('token');
+     const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+     // A) Cargar fondo inicial desde perfil
+     const fetchWallpaper = async () => {
+        try {
+            const data = await fetchDataBackend(`${backendUrl}/estudiante/perfil`, null, "GET", { Authorization: `Bearer ${token}` });
+            if (data && data.preferences && data.preferences.wallpaperUrl) {
+                setCurrentWallpaper(data.preferences.wallpaperUrl);
+            }
+        } catch (e) { console.error(e); }
+     };
+     fetchWallpaper();
+
+     // B) Escuchar evento personalizado desde SettingsApp
+     const handleWallpaperChange = (e) => {
+         if (e.detail) setCurrentWallpaper(e.detail);
+     };
+     window.addEventListener('wallpaper-changed', handleWallpaperChange);
+
+     return () => {
+         window.removeEventListener('wallpaper-changed', handleWallpaperChange);
+     };
   }, []);
 
   // --- NUEVA FUNCIÓN: Persistir movimiento en Backend ---
@@ -531,6 +702,9 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       case 'ai-recommendations': // <--- NUEVO CASE
        return <RecommendationsWidget />;
 
+      case 'settings':
+        return <SettingsApp />;
+
       default:
         return <div className="text-white p-4">App no encontrada</div>;
       }
@@ -634,14 +808,63 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
     }
   };
 
+  // 2. FUNCIÓN PARA ABRIR MODAL DE COMPARTIR
+  const handleOpenShareModal = () => {
+    // Verificamos que sea un item del usuario (no de sistema)
+    if (menuState.selectedItem && !menuState.selectedItem._id.toString().startsWith('sys-')) {
+        handleCloseMenu();
+        setModalMode('share'); // Modo Compartir
+        setIsModalVisible(true);
+    } else {
+        toast.error("No puedes compartir este elemento.");
+        handleCloseMenu();
+    }
+  };
+
+  // 3. FUNCIÓN PARA LLAMAR AL BACKEND (POST /share/:id)
+  const handleShareItem = async (formData) => {
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    const itemId = menuState.selectedItem._id; // El item que seleccionamos con click derecho
+
+    try {
+        const response = await fetchDataBackend(
+            `${backendUrl}/share/${itemId}`, // Endpoint memorizado
+            { email: formData.email, permission: formData.permission },
+            "POST",
+            { Authorization: `Bearer ${token}` }
+        );
+
+        if (response && response.ok) {
+            toast.success(`Invitación enviada a ${formData.email}`);
+            closeModal();
+        }
+    } catch (error) {
+        console.error("Error al compartir:", error);
+    }
+  };
+
 
   return (
     <div className="w-full h-screen overflow-hidden" onContextMenu={handleContextMenu} onClick={handleCloseMenu}>
       
       {/* Fondo */}
       <div className="fixed inset-0 -z-10" 
-           style={{ backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} 
-      />
+            style={{ 
+                backgroundImage: `url(${currentWallpaper})`, // <--- USAR ESTADO
+                backgroundSize: 'cover', 
+                backgroundPosition: 'center',
+                transition: 'background-image 0.5s ease-in-out' // Efecto suave
+            }} 
+       />
+
+      {/* BARRA DE AVISO (Solo si es remoto) */}
+      {/* BARRA DE AVISO (Solo si es remoto) */}
+      {isRemote && (
+        <div className="fixed top-0 left-0 right-0 h-8 bg-red-600 z-[100] flex items-center justify-center text-white text-xs font-bold shadow-lg">
+            VISUALIZANDO ESCRITORIO DE: {remoteUserName?.toUpperCase()} (Modo Espectador)
+        </div>
+      )}
 
       {/* Grid de Íconos */}
       <div className="p-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 content-start h-[calc(100vh-3rem)] overflow-y-auto">
@@ -670,18 +893,27 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         onNewNote={handleCreateQuickNote}
         onNewCode={handleCreateQuickCode}
         onDelete={handleDeleteItem}
+        onShare={handleOpenShareModal}
       />
 
       <Modal 
         isVisible={isModalVisible} 
         onClose={closeModal} 
-        title={modalMode === 'folder' ? "Nueva Carpeta" : "Nuevo Enlace Web"}
+        title={
+            modalMode === 'folder' ? "Nueva Carpeta" : 
+            modalMode === 'link' ? "Nuevo Enlace Web" : 
+            modalMode === 'share' ? "Compartir Elemento" : "" // <--- Título dinámico
+        }
       >
-        {/* Renderizamos condicionalmente el formulario */}
-        {modalMode === 'folder' ? (
-             <NewFolderForm onSubmit={handleCreateItem} />
-        ) : (
-             <NewLinkForm onSubmit={handleCreateItem} />
+        {modalMode === 'folder' && <NewFolderForm onSubmit={handleCreateItem} />}
+        {modalMode === 'link' && <NewLinkForm onSubmit={handleCreateItem} />}
+        
+        {/* Renderizamos el formulario de compartir */}
+        {modalMode === 'share' && (
+            <ShareForm 
+                onSubmit={handleShareItem} 
+                itemToShare={menuState.selectedItem} 
+            />
         )}
       </Modal>
 
@@ -702,6 +934,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
                 defaultY={win.defaultY}
                 defaultWidth={win.defaultWidth}
                 defaultHeight={win.defaultHeight}
+                id={win.id}
+                onDragStop={onDragStop}
               >
                 {renderAppContent(win.appId, win.data)}
               </AppWindow>

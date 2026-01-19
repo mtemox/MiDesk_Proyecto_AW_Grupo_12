@@ -1,6 +1,8 @@
 import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
-moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias  } from '../controllers/estudiante-controller.js';
+moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,  
+compartirEscritorio,
+getDashboardData} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
 import { improveTextIA } from "../controllers/ai-controller.js";
@@ -56,5 +58,9 @@ router.post("/share/:id", verificarTokenJWT, shareItem);
 router.patch("/user/preferences",verificarTokenJWT,actuPreferencias);
 
 router.post("/upload/image",verificarTokenJWT,actualizarImagen);
+
+router.post("/share-desktop", verificarTokenJWT, compartirEscritorio);
+
+router.get("/dashboard-data", verificarTokenJWT, getDashboardData);
 
 export default router;

@@ -1,20 +1,42 @@
 // src/components/WordEditor.jsx
 import React, { useState, useRef, useEffect } from 'react';
+import { useSocket } from '../context/SocketContext';
 import { 
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, 
   List, ListOrdered, Undo, Redo, Download, Type, Palette, Sparkles, Save // <--- AÑADIDO SAVE
 } from 'lucide-react';
 import { toast } from 'react-toastify'; // <--- AÑADIDO
 import { useFetch } from '../hooks/useFetch'; // <--- AÑADIDO
+import { useSearchParams } from 'react-router-dom';
 
 // AHORA RECIBE PROPS DEL SISTEMA
 function WordEditor({ fileId, fileName, initialContent = "" }) {
+  const { socket } = useSocket();
+  const [searchParams] = useSearchParams();
   const [fontSize, setFontSize] = useState('16');
   const [textColor, setTextColor] = useState('#000000');
   const editorRef = useRef(null);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   
   const fetchDataBackend = useFetch(); // <--- HOOK PARA BACKEND
+
+  useEffect(() => {
+    if (!socket || !fileId) return;
+
+    socket.on('file-change', ({ fileId: changedId, content }) => {
+      // Solo actualizamos si es EL MISMO archivo y el contenido es diferente
+      if (changedId === fileId && editorRef.current && editorRef.current.innerHTML !== content) {
+         // Guardamos la posición del cursor (básico)
+         const selection = window.getSelection();
+         // Actualizamos contenido
+         editorRef.current.innerHTML = content;
+      }
+    });
+
+    return () => {
+      socket.off('file-change');
+    };
+  }, [socket, fileId]);
 
   // --- CARGAR CONTENIDO INICIAL ---
   useEffect(() => {
@@ -122,6 +144,28 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
       // toast.error manejado por useFetch
     } finally {
       setIsAIProcessing(false);
+    }
+  };
+
+  // 4. EMITIR CAMBIOS AL ESCRIBIR
+  const handleInput = () => {
+    const content = editorRef.current.innerHTML;
+    
+    // Emitir al socket
+    if (socket && fileId) {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // LÓGICA CLAVE: 
+      // ¿Estoy en remoto? Entonces el destino es el ID de la URL.
+      // ¿Estoy en local? El destino soy yo mismo (user.id).
+      const remoteUserId = searchParams.get('remote');
+      const targetUserId = remoteUserId || user.id; 
+
+      socket.emit('file-change', { 
+        userId: targetUserId, // <--- USAR EL TARGET, NO SIEMPRE MI ID
+        fileId, 
+        content 
+      });
     }
   };
 
@@ -270,6 +314,7 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
       <div
         ref={editorRef}
         contentEditable
+        onInput={handleInput}
         className="flex-1 p-6 overflow-auto focus:outline-none bg-white text-gray-900"
         style={{ minHeight: '100%', fontSize: `${fontSize}px`, lineHeight: '1.6' }}
         suppressContentEditableWarning

@@ -212,28 +212,77 @@ const confirmarMail = async (req, res) => {
  */
 const getDesktop = async (req, res) => {
   try {
-    const userId = req.estudianteHeader._id;
+    const miId = req.estudianteHeader._id; 
+    
+    // 1. OBTENCIÓN Y LIMPIEZA DEL PARÁMETRO
+    // Express a veces devuelve req.query como { 'remoteUserId': '...' } o undefined
+    let { remoteUserId } = req.query;
 
-    console.log("👉 getDesktop userId:", userId);
+    console.log("--- DEBUG GET DESKTOP ---");
+    console.log(`📡 URL solicitada: ${req.originalUrl}`);
+    console.log(`📦 Query Params recibidos:`, req.query);
+    console.log(`👤 ID Solicitante: ${miId}`);
+    console.log(`🎯 Remote ID (crudo): ${remoteUserId}`);
 
-    const items = await Item.find({
-      userId,
-      $or: [
-        { parentId: null },
-        { parentId: { $exists: false } }
-      ]
-    }).lean();
+    let items = [];
 
-    console.log("👉 getDesktop items encontrados:", items.length);
+    // 2. CONDICIÓN RELAJADA
+    // Si existe, no es "undefined" (string), no es "null" (string) y no es mi propio ID
+    const esModoRemoto = remoteUserId && 
+                         remoteUserId !== "undefined" && 
+                         remoteUserId !== "null" && 
+                         String(remoteUserId) !== String(miId);
 
-    return res.status(200).json({
-      ok: true,
-      items
-    });
+    if (esModoRemoto) {
+        console.log(`👉 ENTRANDO A MODO REMOTO (Visitando a ${remoteUserId})`);
+        
+        const yo = await Estudiante.findById(miId);
+        // Validamos permisos
+        const tienePermiso = yo.escritoriosGuardados.some(id => String(id) === String(remoteUserId));
+
+        if (!tienePermiso) {
+            console.log("⛔ Acceso denegado: No está en lista de permitidos");
+            // Por seguridad, si no tiene permiso, devolvemos array vacío o error
+            // Para debug, devolvamos error claro
+            return res.status(403).json({ ok: false, msg: "No tienes permiso para ver este escritorio." });
+        }
+
+        // TRAER ITEMS DEL DUEÑO (REMOTO)
+        items = await Item.find({
+            userId: remoteUserId,
+            $or: [ { parentId: null }, { parentId: { $exists: false } } ]
+        }).lean();
+
+        console.log(`✅ Items remotos encontrados: ${items.length}`);
+
+    } else {
+        console.log("🏠 ENTRANDO A MODO LOCAL");
+        
+        // TRAER MIS ITEMS + COMPARTIDOS
+        items = await Item.find({
+            $or: [
+                { userId: miId, $or: [{ parentId: null }, { parentId: { $exists: false } }] },
+                { "sharedWith.userId": miId }
+            ]
+        }).lean();
+
+        // Aplicar posiciones personalizadas (solo en local)
+        items = items.map(item => {
+            if (String(item.userId) !== String(miId) && item.guestPositions) {
+                const myPos = item.guestPositions.find(gp => String(gp.userId) === String(miId));
+                if (myPos) {
+                    item.position = { x: myPos.x, y: myPos.y };
+                }
+            }
+            return item;
+        });
+    }
+
+    return res.status(200).json({ ok: true, items });
 
   } catch (error) {
-    console.error("❌ Error en getDesktop:", error);
-    return res.status(500).json({ ok: false, msg: `Error en el servidor - ${error}` });
+    console.error("❌ Error CRÍTICO en getDesktop:", error);
+    return res.status(500).json({ ok: false, msg: `Error - ${error.message}` });
   }
 };
 
@@ -339,52 +388,64 @@ const renombrarItem=async(req,res)=>{
 
 
 
-const moverItem=async(req,res)=>{
-  try{
-    const userId=req.estudianteHeader._id;
-    const {id}=req.params;
-    const {x,y,parentId}=req.body;
+const moverItem = async(req, res) => {
+  try {
+    const userId = req.estudianteHeader._id; // Quién mueve
+    const { id } = req.params;
+    const { x, y } = req.body;
 
-    // validación: al menos algo para actualizar
-    if(x===undefined&&y===undefined&&parentId===undefined){
-      return res.status(400).json({ok:false,msg:"Debes enviar x, y o parentId"});
+    if (x === undefined && y === undefined) {
+      return res.status(400).json({ ok: false, msg: "Faltan coordenadas" });
     }
 
-    const item=await Item.findOne({_id:id,userId});
-    if(!item) return res.status(404).json({ok:false,msg:"Ítem no encontrado o no pertenece al usuario"});
+    // Buscamos el ítem (sin filtrar por userId aun, para ver de quién es)
+    const item = await Item.findById(id);
+    if (!item) return res.status(404).json({ ok: false, msg: "Ítem no encontrado" });
 
-    if(x!==undefined){
-      const nx=Number(x);
-      if(Number.isNaN(nx)) return res.status(400).json({ok:false,msg:"x debe ser número"});
-      item.position.x=nx;
+    // VERIFICACIÓN DE PROPIEDAD
+    const isOwner = String(item.userId) === String(userId);
+    const isShared = item.sharedWith.some(s => String(s.userId) === String(userId));
+
+    if (!isOwner && !isShared) {
+      return res.status(403).json({ ok: false, msg: "No tienes permiso para mover esto" });
     }
 
-    if(y!==undefined){
-      const ny=Number(y);
-      if(Number.isNaN(ny)) return res.status(400).json({ok:false,msg:"y debe ser número"});
-      item.position.y=ny;
-    }
+    // LÓGICA DE MOVIMIENTO INDEPENDIENTE
+    if (isOwner) {
+      // Si soy el dueño, actualizo la posición principal
+      if (x !== undefined) item.position.x = Number(x);
+      if (y !== undefined) item.position.y = Number(y);
+    } else {
+      // Si soy invitado, busco si ya tengo una posición guardada
+      const guestPosIndex = item.guestPositions.findIndex(
+        gp => String(gp.userId) === String(userId)
+      );
 
-    if(parentId!==undefined){
-      // permitir null para mover a raíz
-      item.parentId=parentId?parentId:null;
+      if (guestPosIndex >= 0) {
+        // Actualizo existente
+        if (x !== undefined) item.guestPositions[guestPosIndex].x = Number(x);
+        if (y !== undefined) item.guestPositions[guestPosIndex].y = Number(y);
+      } else {
+        // Creo nueva entrada
+        item.guestPositions.push({
+          userId,
+          x: Number(x ?? item.position.x),
+          y: Number(y ?? item.position.y)
+        });
+      }
     }
 
     await item.save();
 
-    const io=req.app.get("io");
-    if(io){
-      const payload={id:item._id,position:item.position,parentId:item.parentId};
-      io.to(`user:${userId}`).emit("item-moved",payload);
-      if(item.sharedWith?.length){
-        item.sharedWith.forEach(s=>io.to(`user:${s.userId}`).emit("item-moved",payload));
-      }
-    }
+    // SOCKETS: Notificar SOLO al usuario que movió (para no afectar al otro)
+    // El frontend ya hace actualización optimista, pero esto confirma.
+    // NOTA: Ya no emitimos a la sala global del dueño para evitar que se mueva en su pantalla.
+    
+    return res.status(200).json({ ok: true, msg: "Ítem movido correctamente" });
 
-    return res.status(200).json({ok:true,msg:"Ítem movido correctamente",item});
-  }catch(error){
-    console.error("❌ moverItem:",error);
-    return res.status(500).json({ok:false,msg:`Error en el servidor - ${error.message}`});
+  } catch (error) {
+    console.error("❌ moverItem:", error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
@@ -396,18 +457,34 @@ const actulizarContenidoTextual = async (req, res) => {
     const userId = req.estudianteHeader._id;
     const { id } = req.params;
     const { content } = req.body;
-    if (!content) {
-      return res.status(400).json({ msg: "El contenido es obligatorio" });
-    }
-    const file = await Item.findOne({_id: id,userId,type: { $in: ["note", "code"] }});
-    if (!file) {
-      return res.status(404).json({msg: "Archivo no encontrado o no editable"});
-    }
+
+    if (!content) return res.status(400).json({ msg: "El contenido es obligatorio" });
+
+    // BUSCAMOS: Que sea mío O que me lo hayan compartido con permiso 'edit'
+    const file = await Item.findOne({
+        _id: id,
+        type: { $in: ["note", "code"] },
+        $or: [
+            { userId: userId }, // Soy el dueño
+            { "sharedWith": { $elemMatch: { userId: userId, permission: "edit" } } } // Soy editor
+        ]
+    });
+
+    if (!file) return res.status(404).json({msg: "Archivo no encontrado o no tienes permiso de edición"});
+
     file.content = content;
     await file.save();
 
-    res.status(200).json({ok: true,msg: "Contenido guardado correctamente"});
+    // SOCKET: Avisar a la sala del DUEÑO del archivo (para que él lo vea en vivo)
+    const io = req.app.get("io");
+    if(io) {
+        // Emitimos a la sala del dueño del archivo
+        io.to(`user:${file.userId}`).emit("file-change", { fileId: id, content });
+    }
+
+    res.status(200).json({ok: true, msg: "Contenido guardado correctamente"});
   } catch (error) {
+    console.error(error);
     res.status(500).json({ msg: "Error guardando contenido" });
   }
 };
@@ -523,6 +600,13 @@ const shareItem = async (req,res)=>{
 
     await item.save();
 
+    // --- NOTIFICACIÓN REAL-TIME (SOCKET) ---
+    const io = req.app.get("io");
+    if(io) {
+        // Le avisamos al usuario invitado que tiene un nuevo ítem
+        io.to(`user:${invitedUser._id}`).emit("item-shared", item);
+    }
+
     return res.status(200).json({
       ok:true,
       msg:"Ítem compartido correctamente",
@@ -537,7 +621,8 @@ const shareItem = async (req,res)=>{
 const actuPreferencias=async(req,res)=>{
   try{
     const userId=req.estudianteHeader._id;
-    const {theme}=req.body;
+    const {theme, wallpaperUrl}=req.body;
+    
 
     if(theme&&!["light","dark"].includes(theme)){
       return res.status(400).json({ok:false,msg:"theme inválido (light/dark)"});
@@ -547,11 +632,15 @@ const actuPreferencias=async(req,res)=>{
     if(!estudiante) return res.status(404).json({ok:false,msg:"Usuario no encontrado"});
 
     if(theme) estudiante.preferences.theme=theme;
+    if (wallpaperUrl) estudiante.preferences.wallpaperUrl = wallpaperUrl;
 
     await estudiante.save();
 
     const io=req.app.get("io");
-    if(io) io.to(`user:${userId}`).emit("preferences-updated",{theme:estudiante.preferences.theme});
+    if (io) io.to(`user:${userId}`).emit("preferences-updated", { 
+        theme: estudiante.preferences.theme,
+        wallpaperUrl: estudiante.preferences.wallpaperUrl 
+    });
 
     return res.status(200).json({ok:true,msg:"Preferencias actualizadas",preferences:estudiante.preferences});
   }catch(error){
@@ -609,6 +698,44 @@ const actualizarImagen = async (req, res) => {
   }
 };
 
+// A. FUNCIÓN PARA COMPARTIR MI ESCRITORIO (Dar permiso)
+const compartirEscritorio = async (req, res) => {
+    try {
+        const ownerId = req.estudianteHeader._id; // Yo
+        const { email } = req.body; // A quién invito
+
+        const invitado = await Estudiante.findOne({ email });
+        if (!invitado) return res.status(404).json({ msg: "Usuario no encontrado" });
+
+        // Evitar duplicados
+        if (!invitado.escritoriosGuardados.includes(ownerId)) {
+            invitado.escritoriosGuardados.push(ownerId);
+            await invitado.save();
+        }
+
+        return res.status(200).json({ ok: true, msg: `Escritorio compartido con ${email}` });
+    } catch (error) {
+        return res.status(500).json({ msg: error.message });
+    }
+};
+
+// B. FUNCIÓN PARA OBTENER EL DASHBOARD (Mis datos + Escritorios guardados)
+const getDashboardData = async (req, res) => {
+    try {
+        const userId = req.estudianteHeader._id;
+        
+        // Buscamos al usuario y "populamos" la lista de escritorios guardados
+        // para obtener sus nombres y emails.
+        const usuario = await Estudiante.findById(userId)
+            .populate('escritoriosGuardados', 'nombre email') 
+            .select('-password -token -confirmMail');
+
+        return res.status(200).json({ ok: true, usuario });
+    } catch (error) {
+        return res.status(500).json({ msg: error.message });
+    }
+};
+
 
 export {
     registro,
@@ -629,6 +756,8 @@ export {
     obetenerRecomendaciones,
     shareItem,
     actuPreferencias,
-    actualizarImagen
+    actualizarImagen,
+    compartirEscritorio,
+    getDashboardData
 }
 

@@ -1,8 +1,8 @@
 // src/components/ContextMenu.jsx
 import React from 'react';
-import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode } from 'lucide-react'; // Íconos opcionales
+import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode, Share2 } from 'lucide-react'; // Íconos opcionales
 
-function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, selectedItem, onDelete }) {
+function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, selectedItem, onDelete, onShare }) {
   
   if (!isVisible) return null;
 
@@ -56,6 +56,14 @@ function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNew
             <>
                 <li className="px-4 py-2 text-xs text-gray-500 font-bold uppercase">
                     {selectedItem.nombre}
+                </li>
+
+                {/* --- NUEVA OPCIÓN: COMPARTIR --- */}
+                <li 
+                    className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
+                    onClick={onShare} // <--- Necesitamos recibir esta prop
+                >
+                    <Share2 size={14} className="text-blue-400" /> Compartir
                 </li>
                 
                 {/* Consumir Endpoint Delete */}

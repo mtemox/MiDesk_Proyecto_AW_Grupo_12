@@ -4,6 +4,8 @@ import Editor, { DiffEditor } from '@monaco-editor/react';
 import { Save, Columns, Code as CodeIcon, FileCode } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useFetch } from '../hooks/useFetch';
+import { useSocket } from '../context/SocketContext';
+import { useSearchParams } from 'react-router-dom';
 
 const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
   // Estado del código actual
@@ -13,6 +15,9 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
   
   const [language, setLanguage] = useState('javascript');
   const [showDiff, setShowDiff] = useState(false);
+
+  const { socket } = useSocket();
+  const [searchParams] = useSearchParams();
   
   const fetchDataBackend = useFetch();
 
@@ -21,6 +26,45 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
     setCode(initialContent);
     setOriginalCode(initialContent);
   }, [initialContent]);
+
+  // --- 3. LOGICA DE SOCKET (NUEVO) ---
+  useEffect(() => {
+    if (!socket) return;
+
+    // Escuchar cambios de código de otros usuarios
+    socket.on('code-change', (data) => {
+       // Si nos llega contenido nuevo, actualizamos el estado
+       if (data.content !== code) {
+           setCode(data.content);
+       }
+       // Opcional: Sincronizar también el lenguaje si cambió
+       if (data.language && data.language !== language) {
+           setLanguage(data.language);
+       }
+    });
+
+    return () => {
+        socket.off('code-change');
+    };
+  }, [socket, code, language]);
+
+  // --- 4. FUNCIÓN PARA EMITIR CAMBIOS ---
+  const handleEditorChange = (value) => {
+     setCode(value); // Actualizar localmente
+
+     // Emitir al socket
+     if (socket) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const remoteId = searchParams.get('remote');
+        const targetUserId = remoteId || user.id;
+
+        socket.emit('code-change', { 
+            userId: targetUserId, // <--- ENVIAMOS A LA SALA DEL DUEÑO
+            content: value,
+            language 
+        });
+     }
+  };
 
   // --- FUNCIÓN GUARDAR ---
   const handleSave = async () => {
@@ -51,6 +95,11 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
   // --- CAMBIAR LENGUAJE ---
   const handleLanguageChange = (e) => {
     setLanguage(e.target.value);
+    // Opcional: Emitir cambio de lenguaje también
+    if(socket) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        socket.emit('code-change', { userId: user.id, content: code, language: newLang });
+    }
   };
 
   return (
@@ -137,7 +186,7 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
             language={language}
             theme="vs-dark"
             value={code}
-            onChange={(value) => setCode(value)}
+            onChange={handleEditorChange}
             options={{
               minimap: { enabled: true },
               fontSize: 14,

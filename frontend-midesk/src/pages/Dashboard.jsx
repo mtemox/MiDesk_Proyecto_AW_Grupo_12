@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Importamos íconos similares a los de Windows 11
-import { Wifi, Accessibility, Power, User, ArrowRight } from 'lucide-react';
+import { Wifi, Accessibility, Power, User, ArrowRight, Monitor } from 'lucide-react';
 import dragonBg from '../assets/wallpapers/deg3.jpg'; // Usaremos tu fondo existente pero lo teñiremos de azul
 import logoMidesk from '../assets/logos/midesk.jpg'; // Tu avatar
 
 function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState({ nombre: 'Cargando...', email: '' });
+  const [sharedDesktops, setSharedDesktops] = useState([]);
 
   useEffect(() => {
     // Recuperamos el usuario guardado en el Login
@@ -21,6 +22,12 @@ function Dashboard() {
   const handleEnterDesktop = () => {
     // Aquí simulamos el "ingreso" al escritorio
     navigate('/desktop');
+  };
+
+  // Entrar a un escritorio REMOTO
+  const handleEnterRemoteDesktop = (remoteId, remoteName) => {
+    // Navegamos pasando el ID en la URL
+    navigate(`/desktop?remote=${remoteId}&name=${encodeURIComponent(remoteName)}`);
   };
 
   const handleLogout = () => {
@@ -97,6 +104,25 @@ function Dashboard() {
                     <img src={logoMidesk} alt="User" className="w-10 h-10 rounded-full object-cover" />
                     <span className="font-medium text-sm">{user.nombre}</span>
                 </div>
+
+                {/* 2. ESCRITORIOS COMPARTIDOS (Mapeo) */}
+                {sharedDesktops.map(desk => (
+                    <div 
+                        key={desk._id}
+                        onClick={() => handleEnterRemoteDesktop(desk._id, desk.nombre)}
+                        className="group bg-gray-900/40 hover:bg-gray-900/60 backdrop-blur-md border border-white/5 rounded-xl p-6 cursor-pointer transition-all hover:scale-[1.02]"
+                    >
+                        <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mb-4 shadow-lg group-hover:bg-purple-500 transition-colors">
+                            <User size={24} className="text-white" />
+                        </div>
+                        <h3 className="font-bold text-lg truncate">{desk.nombre}</h3>
+                        <p className="text-xs text-gray-400 mt-1 truncate">{desk.email}</p>
+                        <div className="mt-4 flex items-center gap-2 text-[10px] text-green-400">
+                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                             Disponible
+                        </div>
+                    </div>
+                ))}
 
                 {/* Otro Usuario (Simulado, podría ser la "Comunidad" en el futuro) */}
                 <div className="p-2 flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity cursor-pointer rounded-lg hover:bg-white/5">

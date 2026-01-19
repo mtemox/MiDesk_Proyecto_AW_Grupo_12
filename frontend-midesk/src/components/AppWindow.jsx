@@ -1,9 +1,11 @@
 // src/components/AppWindow.jsx
 import React from 'react';
 import { Rnd } from 'react-rnd';
-import { X, Minus, Square, Maximize2 } from 'lucide-react'; // Íconos opcionales si quieres dentro de los círculos
+import { X, Minus, Square, Maximize2, Minimize2 } from 'lucide-react'; // Íconos opcionales si quieres dentro de los círculos
 
 function AppWindow({ 
+    id, 
+    onDragStop,
     title, children, onClose, onMinimize, onMaximize, zIndex, onFocus, 
     defaultWidth, defaultHeight, defaultX, defaultY, isMaximized,
     isActive
@@ -17,7 +19,7 @@ function AppWindow({
       
       // Posición y Tamaño
       // Si es maximizado: X=0, Y=0, W=100%, H=100% (menos la barra de tareas aprox)
-      position={isMaximized ? { x: 0, y: 0 } : undefined}
+      position={isMaximized ? { x: 0, y: 0 } : { x: defaultX, y: defaultY }}
       size={isMaximized ? { width: '100%', height: 'calc(100% - 48px)' } : undefined}
       
       default={{
@@ -37,7 +39,12 @@ function AppWindow({
       onMouseDown={onFocus}
       
       // Importante para actualizar la posición interna de Rnd cuando no está maximizado
-      onDragStop={(e, d) => { if(!isMaximized) onFocus(); }}
+      onDragStop={(e, d) => {
+          if(!isMaximized) {
+             onFocus();
+             if(onDragStop) onDragStop(id, d.x, d.y); // <--- AVISAR AL LAYOUT
+          }
+       }}
     >
       <div className={`w-full h-full flex flex-col bg-[#1e1e2e]/95 backdrop-blur-xl 
                        ${isMaximized ? '' : 'rounded-xl'} 

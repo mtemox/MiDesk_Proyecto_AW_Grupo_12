@@ -1,11 +1,48 @@
 // src/layouts/AppLayout.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Desktop from '../components/Desktop';
 import Taskbar from '../components/Taskbar';
+import { useSocket } from '../context/SocketContext';
+import { useSearchParams } from 'react-router-dom';
 
 function AppLayout() {
   const [openWindows, setOpenWindows] = useState([]);
   const [nextZ, setNextZ] = useState(10);
+  const { socket } = useSocket();
+  const [searchParams] = useSearchParams();
+  const remoteUserId = searchParams.get('remote'); // <--- ID DEL DUEÑO REMOTO
+
+  // --- ESCUCHAR EVENTOS (EFECTO ESPEJO) ---
+  useEffect(() => {
+    if (!socket) return;
+
+    // A. Alguien abrió una ventana en otra pestaña
+    socket.on('window-open', (newWindow) => {
+      setOpenWindows(prev => {
+        // Evitar duplicados si ya existe
+        if (prev.find(w => w.id === newWindow.id)) return prev;
+        return [...prev, newWindow];
+      });
+    });
+
+    // B. Alguien cerró una ventana
+    socket.on('window-close', ({ windowId }) => {
+      setOpenWindows(prev => prev.filter(win => win.id !== windowId));
+    });
+
+    // C. Alguien movió una ventana
+    socket.on('window-move', ({ windowId, position }) => {
+      setOpenWindows(prev => prev.map(win => 
+        win.id === windowId ? { ...win, defaultX: position.x, defaultY: position.y } : win
+      ));
+    });
+
+    return () => {
+      socket.off('window-open');
+      socket.off('window-close');
+      socket.off('window-move');
+    };
+  }, [socket]);
 
   const handleOpenWindow = (appId, title, windowOptions = {}, data = null) => {
     if (appId === 'profile' && !windowOptions.defaultWidth) {
@@ -17,31 +54,64 @@ function AppLayout() {
     const defaultX = 50 + offset; 
     const defaultY = 20 + offset;
 
-    const newWindowId = Date.now();
+    const newWindowId = data?._id || Date.now();
     const newZ = nextZ + 1;
     
-    setOpenWindows(prev => [
-      ...prev, 
-      { 
-        id: newWindowId, 
-        appId, 
-        title, 
-        zIndex: newZ, 
-        defaultX, 
-        defaultY,
-        isMinimized: false, // 👈 Nuevo estado
-        isMaximized: false, // 👈 Nuevo estado
-        data,
-        ...windowOptions 
-      }
-    ]);
-    
+    const newWindowObj = { 
+      id: newWindowId, 
+      appId, 
+      title, 
+      zIndex: newZ, 
+      defaultX, 
+      defaultY,
+      isMinimized: false, 
+      isMaximized: false, 
+      data,
+      ...windowOptions 
+    };
+
+    setOpenWindows(prev => [...prev, newWindowObj]);
     setNextZ(newZ);
+
+    // 2. EMITIR al Socket
+    if (socket) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        // Si estoy viendo a otro, le mando el evento a ÉL.
+        const targetId = remoteUserId || user.id; 
+
+        socket.emit('window-open', { 
+            userId: targetId, // <--- CAMBIO AQUÍ
+            windowData: newWindowObj 
+        });
+     }
   };
 
   const handleCloseWindow = (windowId) => {
+    // 1. Cerrar localmente
     setOpenWindows(prev => prev.filter(win => win.id !== windowId));
+
+    // 2. EMITIR al Socket
+    if (socket) {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const targetId = remoteUserId || user.id;
+      socket.emit('window-close', { userId: targetId, windowId });
+    }
   };
+
+  // Necesitamos pasar esta función al Desktop para que Rnd la use al terminar de arrastrar
+  const handleDragStop = (windowId, x, y) => {
+    // Actualizamos localmente (opcional, Rnd lo hace visualmente, pero actualizamos estado)
+    setOpenWindows(prev => prev.map(win => 
+      win.id === windowId ? { ...win, defaultX: x, defaultY: y } : win
+    ));
+
+    // EMITIR movimiento
+    if (socket) {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const targetId = remoteUserId || user.id;
+      socket.emit('window-move', { userId: targetId, windowId, position: { x, y } });
+    }
+  }
 
   // 👈 NUEVO: Minimizar (Ocultar)
   const handleMinimizeWindow = (windowId) => {
@@ -73,9 +143,10 @@ function AppLayout() {
          openWindows={openWindows}
          onOpenWindow={handleOpenWindow}
          onCloseWindow={handleCloseWindow}
-         onMinimizeWindow={handleMinimizeWindow} // 👈 Pasamos función
-         onMaximizeWindow={handleMaximizeWindow} // 👈 Pasamos función
+         onMinimizeWindow={handleMinimizeWindow}
+         onMaximizeWindow={handleMaximizeWindow}
          onFocusWindow={handleFocusWindow}
+         onDragStop={handleDragStop}
       />
       
       {/* (Nota: En el futuro, la Taskbar usará openWindows para restaurar las minimizadas) */}

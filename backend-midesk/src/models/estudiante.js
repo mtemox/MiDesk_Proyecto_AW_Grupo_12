@@ -46,7 +46,12 @@ const estudianteSchema = new Schema({
     preferences:{
     theme:{type:String,enum:["light","dark"],default:"light"},
     wallpaperUrl:{type:String,default:null}
-    }
+    },
+
+    escritoriosGuardados: [{
+        type: Schema.Types.ObjectId,
+        ref: 'estudiante'
+    }],
 
 
 },

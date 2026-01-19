@@ -43,6 +43,14 @@ const itemSchema = new Schema(
       y: { type: Number, default: 100 },
     },
 
+    guestPositions: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: "estudiante" },
+        x: Number,
+        y: Number
+      }
+    ],
+
     // 🆕 Compartido con otros usuarios
     sharedWith: [
       {
