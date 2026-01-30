@@ -631,8 +631,10 @@ const actuPreferencias=async(req,res)=>{
     const estudiante=await Estudiante.findById(userId);
     if(!estudiante) return res.status(404).json({ok:false,msg:"Usuario no encontrado"});
 
-    if(theme) estudiante.preferences.theme=theme;
-    if (wallpaperUrl) estudiante.preferences.wallpaperUrl = wallpaperUrl;
+    if (theme) estudiante.preferences.theme=theme;
+    if (wallpaperUrl !== undefined) {
+        estudiante.preferences.wallpaperUrl = wallpaperUrl;
+    }
 
     await estudiante.save();
 

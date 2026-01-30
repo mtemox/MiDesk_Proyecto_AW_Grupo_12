@@ -5,7 +5,7 @@ compartirEscritorio,
 getDashboardData} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
-import { improveTextIA } from "../controllers/ai-controller.js";
+import { improveTextIA, chatWithMiDesk } from "../controllers/ai-controller.js";
 
 
 const router = Router()
@@ -62,5 +62,9 @@ router.post("/upload/image",verificarTokenJWT,actualizarImagen);
 router.post("/share-desktop", verificarTokenJWT, compartirEscritorio);
 
 router.get("/dashboard-data", verificarTokenJWT, getDashboardData);
+
+// Chatbot
+
+router.post('/ia/chat', verificarTokenJWT, chatWithMiDesk);
 
 export default router;

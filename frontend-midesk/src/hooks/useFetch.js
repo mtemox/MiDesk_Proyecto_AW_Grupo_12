@@ -14,7 +14,8 @@ export function useFetch() {
                 url,
                 headers: {
                     ...headers, // Mantenemos headers extra (como Authorization)
-                }
+                },
+                
             };
 
             // 2. CORRECCIÓN: Solo agregamos Body y Content-Type si hay datos

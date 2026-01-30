@@ -15,6 +15,7 @@ import Modal from './Modal'; // Importar Modal
 import NewLinkForm from './NewLinkForm'; 
 import FolderContent from './FolderContent';
 import NewFolderForm from './NewFolderForm';
+import ChatWidget from './widgets/ChatWidget';
 
 // Widgets y Apps
 import CodeEditor from './CodeEditor';
@@ -47,6 +48,14 @@ import aiIcon from '../assets/icons/chat.png';
 // Traemos las imágenes que ya tenías
 
 const systemAppsBase = [
+  { 
+    _id: 'sys-9',
+    nombre: 'Chat MiDesk', 
+    imgSrc: aiIcon, 
+    type: 'app', 
+    appId: 'ai-chat', 
+    windowOptions: { defaultWidth: 400, defaultHeight: 600 } 
+  },
   { _id: 'sys-8', nombre: 'Asistente IA', imgSrc: aiIcon, type: 'app', appId: 'ai-recommendations' },
   { _id: 'sys-7', nombre: 'Bloc de Notas', imgSrc: noteIcon, type: 'app', appId: 'notepad' },
   
@@ -704,6 +713,9 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
       case 'settings':
         return <SettingsApp />;
+
+      case 'ai-chat':
+        return <ChatWidget />;
 
       default:
         return <div className="text-white p-4">App no encontrada</div>;
