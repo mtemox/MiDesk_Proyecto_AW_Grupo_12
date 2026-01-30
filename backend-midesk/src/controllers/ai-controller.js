@@ -47,7 +47,13 @@ const chatWithMiDesk = async (req, res) => {
 
         // Hacemos la petición al Python de Oscar
         // Python espera: { "mensaje": "..." }
-        const response = await axios.post(pythonUrl, { mensaje });
+        const response = await axios.post(
+            pythonUrl, 
+            { mensaje },
+            { 
+                timeout: 120000
+            }
+        );
 
         // Devolvemos la respuesta de Python tal cual al Frontend
         // Python devuelve: { "respuesta": "...", "metricas": {...} }
