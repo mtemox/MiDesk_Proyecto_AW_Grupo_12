@@ -1,4 +1,9 @@
 import axios from "axios";
+import { InferenceClient } from "@huggingface/inference";
+import { subirBase64Cloudinary } from "../helpers/uploadCloudinary.js"; 
+import Estudiante from "../models/estudiante.js"; 
+
+const hf = new InferenceClient(process.env.HF_API_KEY);
 
 const improveTextIA = async (req, res) => {
   try {
@@ -74,4 +79,74 @@ const chatWithMiDesk = async (req, res) => {
     }
 };
 
-export { improveTextIA, chatWithMiDesk };
+
+const generateWallpaperIA = async (req, res) => {
+    try {
+        const userId = req.estudianteHeader._id;
+        const { prompt } = req.body;
+
+        if (!prompt) return res.status(400).json({ ok: false, msg: "El prompt es obligatorio" });
+
+        console.log(`🎨 Generando fondo SDXL (Free Tier) para: "${prompt}"`);
+
+        // 1. LLAMADA A LA IA CON LA LIBRERÍA OFICIAL
+        // La clave aquí es 'provider: "hf-inference"', eso evita el error de pagos
+        const imageBlob = await hf.textToImage({
+            model: "stabilityai/stable-diffusion-xl-base-1.0",
+            inputs: prompt,
+            provider: "hf-inference", // <--- ¡ESTA ES LA LÍNEA MÁGICA! 
+            parameters: { 
+                negative_prompt: "blurry, low quality, distortion" // Ayuda a mejorar la calidad
+            }
+        });
+
+        // 2. CONVERSIÓN (Blob -> Base64)
+        const arrayBuffer = await imageBlob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
+
+        // 3. SUBIDA A CLOUDINARY
+        console.log("☁️ Subiendo a Cloudinary...");
+        const secure_url = await subirBase64Cloudinary(base64Image, "VirtualDesk_Wallpapers");
+
+        // 4. GUARDAR EN BD
+        await Estudiante.findByIdAndUpdate(userId, {
+            "preferences.wallpaperUrl": secure_url
+        });
+
+        // 5. NOTIFICACIÓN REAL-TIME (SOCKET.IO)
+        const io = req.app.get("io");
+        if (io) {
+            console.log(`📡 Enviando update a user:${userId}`);
+            io.to(`user:${userId}`).emit("preferences-updated", { 
+                theme: "light",
+                wallpaperUrl: secure_url 
+            });
+        }
+
+        return res.status(200).json({ 
+            ok: true, 
+            msg: "Fondo generado con éxito",
+            url: secure_url 
+        });
+
+    } catch (error) {
+        console.error("❌ Error generando wallpaper:", error); // Imprime el error completo para debug
+
+        // Si el servidor gratuito está ocupado o "dormido" (Error 503 o 500 a veces)
+        if (error.message && (error.message.includes("503") || error.message.includes("loading"))) {
+             return res.status(503).json({ 
+                ok: false, 
+                msg: "La IA se está despertando 😴. Espera unos segundos e intenta de nuevo." 
+            });
+        }
+
+        return res.status(500).json({ 
+            ok: false, 
+            msg: "Error al generar imagen IA", 
+            error: error.message 
+        });
+    }
+};
+
+export { improveTextIA, chatWithMiDesk, generateWallpaperIA };

@@ -5,8 +5,7 @@ compartirEscritorio,
 getDashboardData} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
 
-import { improveTextIA, chatWithMiDesk } from "../controllers/ai-controller.js";
-
+import { improveTextIA, chatWithMiDesk, generateWallpaperIA } from "../controllers/ai-controller.js";
 
 const router = Router()
 
@@ -59,7 +58,7 @@ router.patch("/user/preferences",verificarTokenJWT,actuPreferencias);
 
 router.post("/upload/image",verificarTokenJWT,actualizarImagen);
 
-outer.post("/payments/create-intent", verificarTokenJWT, crearPago);
+router.post("/payments/create-intent", verificarTokenJWT, crearPago);
 
 router.post("/share-desktop", verificarTokenJWT, compartirEscritorio);
 
@@ -69,5 +68,8 @@ router.get("/dashboard-data", verificarTokenJWT, getDashboardData);
 
 router.post('/ia/chat', verificarTokenJWT, chatWithMiDesk);
 
+// Wallpapers con ia hugging face
+
+router.post('/ia/generate-wallpaper', verificarTokenJWT, generateWallpaperIA);
 
 export default router;
