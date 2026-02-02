@@ -1,6 +1,6 @@
 import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
-moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,  
+moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,crearPago,  
 compartirEscritorio,
 getDashboardData} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT } from '../middlewares/JWT.js';
@@ -59,6 +59,8 @@ router.patch("/user/preferences",verificarTokenJWT,actuPreferencias);
 
 router.post("/upload/image",verificarTokenJWT,actualizarImagen);
 
+outer.post("/payments/create-intent", verificarTokenJWT, crearPago);
+
 router.post("/share-desktop", verificarTokenJWT, compartirEscritorio);
 
 router.get("/dashboard-data", verificarTokenJWT, getDashboardData);
@@ -66,5 +68,6 @@ router.get("/dashboard-data", verificarTokenJWT, getDashboardData);
 // Chatbot
 
 router.post('/ia/chat', verificarTokenJWT, chatWithMiDesk);
+
 
 export default router;
