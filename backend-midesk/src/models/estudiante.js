@@ -48,6 +48,11 @@ const estudianteSchema = new Schema({
     wallpaperUrl:{type:String,default:null}
     },
 
+    googleId: {
+        type: String,
+        default: null
+    },
+
     escritoriosGuardados: [{
         type: Schema.Types.ObjectId,
         ref: 'estudiante'

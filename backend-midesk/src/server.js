@@ -12,9 +12,9 @@ import routerEstudiantes from './routers/estudiante-routes.js'
 const app = express();
 dotenv.config();
 
-
-
-
+//Passport
+import passport from 'passport';
+import './config/passport.js';
 
 // Configuraciones
 cloudinary.config({
@@ -32,6 +32,9 @@ app.use(fileUpload({
     useTempFiles : true,
     tempFileDir : './uploads'
 }))
+
+//passport
+app.use(passport.initialize());
 
 // Variables de entorno o variables globales
 app.set('port', process.env.PORT || 3000);

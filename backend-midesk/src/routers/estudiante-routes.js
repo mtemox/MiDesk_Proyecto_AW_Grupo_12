@@ -3,11 +3,13 @@ import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPasswo
 moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,crearPago,  
 compartirEscritorio,
 getDashboardData} from '../controllers/estudiante-controller.js';
-import { verificarTokenJWT } from '../middlewares/JWT.js';
+import { verificarTokenJWT, crearTokenJWT } from '../middlewares/JWT.js';
 
 import { improveTextIA, chatWithMiDesk, generateWallpaperIA } from "../controllers/ai-controller.js";
 
 const router = Router()
+
+import passport from 'passport';
 
 
 console.log("✅ [estudiante-routes.js] Archivo cargado y definiendo rutas.");
@@ -23,7 +25,29 @@ router.get('/recuperarPassword/:token',comprobarTokenPassword)
 router.post('/nuevoPassword/:token',crearNuevoPassword)
 
 
+// Passportjs
 
+// 1. Ruta que inicia el proceso (El botón "Entrar con Google" del frontend apunta aquí)
+router.get('/auth/google', passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    session: false // Usamos JWT, no sesiones de servidor
+}));
+
+// 2. Ruta de retorno (Google te devuelve aquí)
+router.get('/auth/google/callback', 
+    passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+    (req, res) => {
+        // Si llega aquí, el usuario ya fue autenticado y está en req.user
+        const usuario = req.user;
+
+        // Creamos tu JWT usando TU función existente
+        const token = crearTokenJWT(usuario._id, usuario.rol);
+
+        // REDIRECCIONAMOS al Frontend con el token en la URL
+        // (El frontend debe leer este token de la URL y guardarlo en localStorage)
+        res.redirect(`${process.env.URL_FRONTEND}/google-success?token=${token}`);
+    }
+);
 
 router.post('/estudiante/login',login)
 
