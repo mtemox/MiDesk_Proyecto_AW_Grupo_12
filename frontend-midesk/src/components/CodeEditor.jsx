@@ -87,6 +87,9 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
       // Actualizamos el "original" para que el Diff sepa que ya guardamos
       setOriginalCode(code);
       // toast.success manejado por useFetch
+      
+      window.dispatchEvent(new CustomEvent('local-file-update', { detail: { id: fileId, content: code } }));
+
     } catch (error) {
       console.error("Error al guardar código:", error);
     }

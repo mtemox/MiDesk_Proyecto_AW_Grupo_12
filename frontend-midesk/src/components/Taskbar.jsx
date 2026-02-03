@@ -26,7 +26,7 @@ const SettingsIcon = () => (
 );
 
 
-function Taskbar({ onOpenApp }) {
+function Taskbar({ onOpenApp, openWindows = [], onMinimize, onFocus }) {
   // Estado para la hora y fecha
   const [currentTime, setCurrentTime] = useState(new Date());
   
@@ -97,6 +97,15 @@ function Taskbar({ onOpenApp }) {
     setPosition(current => current === 'bottom' ? 'left' : current === 'left' ? 'right' : 'bottom');
   };
 
+  // Helper para obtener icono según appId (puedes expandir esto o importar getIconImage si quieres ser estricto)
+  // Por simplicidad visual, usaremos un icono genérico si no tenemos la imagen a mano,
+  // pero idealmente deberías pasar el imgSrc dentro de 'openWindows' desde Desktop.
+  const getAppIcon = (win) => {
+      if (win.data && win.data.imgSrc) return win.data.imgSrc;
+      // Icono fallback visual
+      return "https://cdn-icons-png.flaticon.com/512/732/732205.png"; 
+  };
+
   return (
     <>
       {/* Menú Inicio */}
@@ -121,6 +130,44 @@ function Taskbar({ onOpenApp }) {
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
+          
+          {/* Ventanas abiertas */}
+          <div className="flex items-center gap-1 h-full">
+                {openWindows.map((win) => (
+                    <button
+                        key={win.id}
+                        onClick={() => {
+                            if (win.isMinimized) {
+                                onMinimize(win.id); // Restaurar
+                                onFocus(win.id);    // Traer al frente
+                            } else {
+                                // Si ya está activa y visible, la minimizamos
+                                onMinimize(win.id);
+                            }
+                        }}
+                        className={`
+                            group relative flex items-center justify-center w-10 h-9 rounded-md transition-all duration-200
+                            ${!win.isMinimized ? 'bg-white/10 border-b-2 border-purple-500' : 'hover:bg-white/5 opacity-60 hover:opacity-100'}
+                        `}
+                        title={win.title}
+                    >
+                        {/* Icono de la App */}
+                        <div className="w-6 h-6 flex items-center justify-center">
+                           {/* Usamos una imagen pequeña. Si en Desktop.jsx pasaste imgSrc en 'data', lo usamos */}
+                           {win.data?.imgSrc ? (
+                               <img src={win.data.imgSrc} alt="app" className="w-full h-full object-contain" />
+                           ) : (
+                               <div className="w-4 h-4 bg-purple-400 rounded-full"></div>
+                           )}
+                        </div>
+
+                        {/* Tooltip Hover (Opcional estilo Windows) */}
+                        <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-xs px-2 py-1 rounded border border-white/10 whitespace-nowrap pointer-events-none">
+                            {win.title}
+                        </div>
+                    </button>
+                ))}
+            </div>
 
           {/* --- DERECHA / ABAJO: Reloj y Configuración --- */}
           <div className={clockGroupClasses}>

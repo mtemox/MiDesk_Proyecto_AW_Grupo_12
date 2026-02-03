@@ -30,6 +30,11 @@ const itemSchema = new Schema(
       default: null,
     },
 
+    content: {
+      type: String,
+      default: "" 
+    },
+
     // Si es ítem raíz => null
     parentId: {
       type: Schema.Types.ObjectId,

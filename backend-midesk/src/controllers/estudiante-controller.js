@@ -757,6 +757,17 @@ const getDashboardData = async (req, res) => {
     }
 };
 
+const getItemById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const item = await Item.findById(id);
+        if (!item) return res.status(404).json({ ok: false, msg: "Ítem no encontrado" });
+        return res.status(200).json({ ok: true, item });
+    } catch (error) {
+        return res.status(500).json({ ok: false, msg: error.message });
+    }
+};
+
 
 export {
     registro,
@@ -780,7 +791,8 @@ export {
     actualizarImagen,
     compartirEscritorio,
     getDashboardData,
-    crearPago
+    crearPago,
+    getItemById
 }
 
 

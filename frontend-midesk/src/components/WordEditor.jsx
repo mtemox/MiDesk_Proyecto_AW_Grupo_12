@@ -102,6 +102,9 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
         { Authorization: `Bearer ${token}` }
       );
       // El hook useFetch ya muestra el mensaje de éxito del backend
+    
+      window.dispatchEvent(new CustomEvent('local-file-update', { detail: { id: fileId, content } }));
+      
     } catch (error) {
       console.error("Error guardando:", error);
     }

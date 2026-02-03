@@ -284,6 +284,13 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             // if (prefs.theme) ...
         });
 
+      socket.on('file-change', ({ fileId, content }) => {
+        // Buscamos el ícono y le actualizamos su contenido interno
+        setIcons(prev => prev.map(icon => 
+            icon._id === fileId ? { ...icon, content: content } : icon
+        ));
+      });
+
 
     }
 
@@ -315,6 +322,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
          socket.off('item-renamed');
          socket.off('item-deleted');
          socket.off('item-shared');
+         socket.off('file-change');
        }
     };
 
@@ -342,8 +350,20 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
      };
      window.addEventListener('wallpaper-changed', handleWallpaperChange);
 
+     const handleLocalUpdate = (e) => {
+          const { id, content } = e.detail;
+          console.log("🔄 Actualizando escritorio localmente:", id);
+          
+          setIcons(prev => prev.map(icon => 
+              icon._id === id ? { ...icon, content: content } : icon
+          ));
+      };
+
+      window.addEventListener('local-file-update', handleLocalUpdate);
+
      return () => {
          window.removeEventListener('wallpaper-changed', handleWallpaperChange);
+         window.removeEventListener('local-file-update', handleLocalUpdate);
      };
   }, []);
 
@@ -585,19 +605,19 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         );
 
         if (response && response.ok) {
-            const createdItem = response.item;
+            // const createdItem = response.item;
             
             // Formateamos para el UI
-            const newIconUI = {
-                _id: createdItem._id,
-                nombre: createdItem.name,
-                imgSrc: getIconImage(createdItem.type), // Usa tu helper existente
-                type: createdItem.type,
-                url: createdItem.url,
-                windowOptions: { defaultWidth: 500, defaultHeight: 400 } // Opcional
-            };
+            // const newIconUI = {
+            //     _id: createdItem._id,
+            //     nombre: createdItem.name,
+            //     imgSrc: getIconImage(createdItem.type), // Usa tu helper existente
+            //     type: createdItem.type,
+            //     url: createdItem.url,
+            //     windowOptions: { defaultWidth: 500, defaultHeight: 400 } // Opcional
+            // };
 
-            setIcons(prev => [...prev, newIconUI]);
+            // setIcons(prev => [...prev, newIconUI]);
             closeModal();
             toast.success(itemType === 'folder' ? "Carpeta creada" : "Enlace creado");
         }
@@ -751,20 +771,20 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         );
 
         if (response && response.ok) {
-            const createdItem = response.item;
+            // const createdItem = response.item;
             
             // Creamos el objeto para la UI
-            const newIconUI = {
-                _id: createdItem._id,
-                nombre: createdItem.name,
-                imgSrc: getIconImage('note'), // Asegúrate que 'note' devuelva tu icono de nota
-                type: 'note',
-                url: null,
-                content: "", // Contenido vacío al inicio
-                position: { x: posX, y: posY }
-            };
+            // const newIconUI = {
+            //     _id: createdItem._id,
+            //     nombre: createdItem.name,
+            //     imgSrc: getIconImage('note'), // Asegúrate que 'note' devuelva tu icono de nota
+            //     type: 'note',
+            //     url: null,
+            //     content: "", // Contenido vacío al inicio
+            //     position: { x: posX, y: posY }
+            // };
 
-            setIcons(prev => [...prev, newIconUI]);
+            // setIcons(prev => [...prev, newIconUI]);
             toast.success("Nota creada. Haz clic en el nombre para renombrar.");
         }
     } catch (error) {
@@ -800,19 +820,19 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         );
 
         if (response && response.ok) {
-            const createdItem = response.item;
+            // const createdItem = response.item;
             
-            const newIconUI = {
-                _id: createdItem._id,
-                nombre: createdItem.name,
-                imgSrc: getIconImage('code'), // Usará el ícono de código
-                type: 'code',
-                url: null,
-                content: "", 
-                position: { x: posX, y: posY }
-            };
+            // const newIconUI = {
+            //     _id: createdItem._id,
+            //     nombre: createdItem.name,
+            //     imgSrc: getIconImage('code'), // Usará el ícono de código
+            //     type: 'code',
+            //     url: null,
+            //     content: "", 
+            //     position: { x: posX, y: posY }
+            // };
 
-            setIcons(prev => [...prev, newIconUI]);
+            // setIcons(prev => [...prev, newIconUI]);
             toast.success("Archivo de código creado.");
         }
     } catch (error) {

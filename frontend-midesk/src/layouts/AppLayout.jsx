@@ -150,7 +150,12 @@ function AppLayout() {
       />
       
       {/* (Nota: En el futuro, la Taskbar usará openWindows para restaurar las minimizadas) */}
-      <Taskbar onOpenApp={handleOpenWindow} />
+      <Taskbar 
+          openWindows={openWindows} 
+          onOpenApp={handleOpenWindow}
+          onMinimize={handleMinimizeWindow} // Para restaurar/minimizar desde la barra
+          onFocus={handleFocusWindow}       // Para traer al frente
+      />
     </main>
   );
 }
