@@ -1,6 +1,6 @@
 // src/components/ContextMenu.jsx
 import React from 'react';
-import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode, Share2 } from 'lucide-react'; // Íconos opcionales
+import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode, Share2 } from 'lucide-react';
 
 function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, selectedItem, onDelete, onShare }) {
   
@@ -8,67 +8,113 @@ function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNew
 
   return (
     <div 
-      className="absolute z-50 w-52 bg-[#1e1e2e]/95 backdrop-blur-md
-                 rounded-lg shadow-2xl border border-white/10
-                 text-gray-200 animate-scale-in overflow-hidden"
+      className="
+                  absolute z-[9999] w-56 rounded-lg py-1.5 overflow-hidden animate-scale-in
+                  bg-white/95 dark:bg-[#1a1a1a]/95 
+                  backdrop-blur-xl 
+                  border border-slate-200 dark:border-white/10 
+                  shadow-xl 
+                  shadow-black/10 dark:shadow-black/50
+                  text-slate-700 dark:text-gray-200
+                  transition-colors duration-300
+              "
       style={{ top: `${y}px`, left: `${x}px` }}
     >
       <ul className="py-1">
         
-        {/* Opciones Generales (siempre visibles) */}
-        
         {/* Nueva Carpeta */}
         <li 
-           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
-           onClick={onNewFolder} // <--- AQUI ESTABA EL PROBLEMA (Faltaba esto)
+           className="
+                        flex items-center gap-2 px-4 py-2 text-sm cursor-pointer 
+                        text-slate-700 dark:text-gray-200
+                        hover:bg-blue-500 hover:text-white
+                        dark:hover:bg-blue-600 dark:hover:text-white
+                        transition-colors duration-150
+                    "
+           onClick={onNewFolder}
         >
            <FolderPlus size={14} /> Nueva Carpeta
         </li>
 
-        {/* --- NUEVA OPCIÓN: NUEVA NOTA (SIN FORMULARIO) --- */}
+        {/* Nueva Nota */}
         <li 
-           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
-           onClick={onNewNote} // <--- LLAMADA A LA FUNCIÓN
+           className="
+                      flex items-center gap-2 px-4 py-2 text-sm cursor-pointer
+                      text-slate-700 dark:text-gray-200
+                      hover:bg-blue-500 hover:text-white
+                      dark:hover:bg-blue-600 dark:hover:text-white
+                      transition-colors duration-150
+                  "
+           onClick={onNewNote}
         >
            <FileText size={14} /> Nueva Nota
         </li>
 
-        {/* --- NUEVA OPCIÓN: NUEVO CÓDIGO --- */}
+        {/* Nuevo Código */}
         <li 
-           className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
-           onClick={onNewCode} // <--- LLAMADA A LA FUNCIÓN
+           className="
+                      flex items-center gap-2 px-4 py-2 text-sm cursor-pointer
+                      text-slate-700 dark:text-gray-200
+                      hover:bg-blue-500 hover:text-white
+                      dark:hover:bg-blue-600 dark:hover:text-white
+                      transition-colors duration-150
+                  "
+           onClick={onNewCode}
         >
            <FileCode size={14} /> Nuevo Código
         </li>
         
+        {/* Nuevo Enlace */}
         <li 
-          className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
+          className="
+                      flex items-center gap-2 px-4 py-2 text-sm cursor-pointer
+                      text-slate-700 dark:text-gray-200
+                      hover:bg-blue-500 hover:text-white
+                      dark:hover:bg-blue-600 dark:hover:text-white
+                      transition-colors duration-150
+                  "
           onClick={onNewLink}
         >
           <LinkIcon size={14} /> Nuevo Enlace
         </li>
 
         {/* Separador */}
-        <div className="border-t border-white/10 my-1"></div>
+        <div className="border-t border-slate-200 dark:border-white/10 my-1"></div>
 
-        {/* Opciones ESPECÍFICAS DE ÍTEM (Solo si hay un ítem seleccionado) */}
+        {/* Opciones ESPECÍFICAS DE ÍTEM */}
         {selectedItem && (
             <>
-                <li className="px-4 py-2 text-xs text-gray-500 font-bold uppercase">
+                <li className="
+                              px-4 py-2 text-xs 
+                              text-slate-500 dark:text-gray-500 
+                              font-bold uppercase
+                            ">
                     {selectedItem.nombre}
                 </li>
 
-                {/* --- NUEVA OPCIÓN: COMPARTIR --- */}
+                {/* Compartir */}
                 <li 
-                    className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-2"
-                    onClick={onShare} // <--- Necesitamos recibir esta prop
+                    className="
+                                  flex items-center gap-2 px-4 py-2 text-sm cursor-pointer
+                                  text-slate-700 dark:text-gray-200
+                                  hover:bg-blue-500 hover:text-white
+                                  dark:hover:bg-blue-600 dark:hover:text-white
+                                  transition-colors duration-150
+                              "
+                    onClick={onShare}
                 >
-                    <Share2 size={14} className="text-blue-400" /> Compartir
+                    <Share2 size={14} className="text-blue-500 dark:text-blue-400" /> Compartir
                 </li>
                 
-                {/* Consumir Endpoint Delete */}
+                {/* Eliminar */}
                 <li 
-                    className="px-4 py-2 hover:bg-red-500/20 text-red-400 hover:text-red-300 cursor-pointer text-sm flex items-center gap-2"
+                    className="
+                              flex items-center gap-2 px-4 py-2 text-sm cursor-pointer
+                              text-red-500 dark:text-red-400
+                              hover:bg-red-500/20 dark:hover:bg-red-500/30 
+                              hover:text-red-600 dark:hover:text-red-300
+                              transition-colors duration-150
+                            "
                     onClick={() => onDelete(selectedItem)}
                 >
                     <Trash2 size={14} /> Eliminar
@@ -77,7 +123,12 @@ function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNew
         )}
 
         {!selectedItem && (
-             <li className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm">
+             <li className="
+                          px-4 py-2 text-sm cursor-pointer
+                          text-slate-700 dark:text-gray-200
+                          hover:bg-slate-100 dark:hover:bg-white/10
+                          transition-colors duration-150
+                        ">
                 Propiedades
             </li>
         )}

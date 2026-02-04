@@ -8,6 +8,7 @@ import Recommendation from "../models/recomendaciones.js"
 import fs from "fs";
 import stripe from "../helpers/stripe.js";
 import {subirImagenCloudinary} from "../helpers/uploadCloudinary.js"
+import Workspace from "../models/Workspace.js";
 
 const registro = async (req,res)=>{
 
@@ -213,62 +214,94 @@ const confirmarMail = async (req, res) => {
  */
 const getDesktop = async (req, res) => {
   try {
-    const miId = req.estudianteHeader._id; 
-    
-    // 1. OBTENCIÓN Y LIMPIEZA DEL PARÁMETRO
-    // Express a veces devuelve req.query como { 'remoteUserId': '...' } o undefined
-    let { remoteUserId } = req.query;
+    const miId = req.estudianteHeader._id;
+    let { remoteUserId, folderId, workspaceId } = req.query;
 
-    console.log("--- DEBUG GET DESKTOP ---");
-    console.log(`📡 URL solicitada: ${req.originalUrl}`);
-    console.log(`📦 Query Params recibidos:`, req.query);
-    console.log(`👤 ID Solicitante: ${miId}`);
-    console.log(`🎯 Remote ID (crudo): ${remoteUserId}`);
+    console.log(`🔎 GetDesktop Params:`, req.query);
 
-    let items = [];
+    // 🔴 1. MODO WORKSPACE (NUEVO BLOQUE PRIORITARIO)
+    if (workspaceId && workspaceId !== "null" && workspaceId !== "undefined") {
+        
+        // A. Verificar Permisos (Seguridad)
+        const workspace = await Workspace.findById(workspaceId);
+        if (!workspace) return res.status(404).json({ ok: false, msg: "Workspace no encontrado" });
 
-    // 2. CONDICIÓN RELAJADA
-    // Si existe, no es "undefined" (string), no es "null" (string) y no es mi propio ID
+        const esMiembro = workspace.miembros.includes(miId);
+        if (!esMiembro) return res.status(403).json({ ok: false, msg: "No tienes acceso a este espacio" });
+
+        // B. Buscar Ítems del Workspace
+        // Buscamos ítems que tengan este workspaceId Y respeten la carpeta (o raíz)
+        const queryWS = { workspaceId: workspaceId };
+        
+        if (folderId && folderId !== "null") {
+            queryWS.parentId = folderId;
+        } else {
+            queryWS.$or = [ { parentId: null }, { parentId: { $exists: false } } ];
+        }
+
+        const items = await Item.find(queryWS).lean();
+        
+        return res.status(200).json({ ok: true, items });
+    }
+    // 🔴 FIN BLOQUE WORKSPACE
+
+    // 1. DEFINIR OBJETIVO (¿De quién son los archivos?)
+    // Si hay un ID remoto válido y no soy yo, activo modo remoto.
     const esModoRemoto = remoteUserId && 
                          remoteUserId !== "undefined" && 
                          remoteUserId !== "null" && 
                          String(remoteUserId) !== String(miId);
 
+    const targetUserId = esModoRemoto ? remoteUserId : miId;
+
+    console.log(`🔎 GetDesktop | Solicitante: ${miId} | Objetivo: ${targetUserId} | Carpeta: ${folderId || 'RAIZ'}`);
+
+    // 2. SEGURIDAD (Solo si es modo remoto)
     if (esModoRemoto) {
-        console.log(`👉 ENTRANDO A MODO REMOTO (Visitando a ${remoteUserId})`);
-        
         const yo = await Estudiante.findById(miId);
-        // Validamos permisos
-        const tienePermiso = yo.escritoriosGuardados.some(id => String(id) === String(remoteUserId));
+        // Verificamos si tengo el ID del objetivo en mis guardados
+        const tienePermiso = yo.escritoriosGuardados.some(id => String(id) === String(targetUserId));
 
         if (!tienePermiso) {
-            console.log("⛔ Acceso denegado: No está en lista de permitidos");
-            // Por seguridad, si no tiene permiso, devolvemos array vacío o error
-            // Para debug, devolvamos error claro
+            console.log("⛔ Acceso denegado a escritorio remoto");
             return res.status(403).json({ ok: false, msg: "No tienes permiso para ver este escritorio." });
         }
+    }
 
-        // TRAER ITEMS DEL DUEÑO (REMOTO)
-        items = await Item.find({
-            userId: remoteUserId,
-            $or: [ { parentId: null }, { parentId: { $exists: false } } ]
-        }).lean();
+    // 3. PREPARAR CONSULTA
+    const query = { userId: targetUserId };
 
-        console.log(`✅ Items remotos encontrados: ${items.length}`);
-
+    // Filtro por Carpeta o Raíz
+    if (folderId && folderId !== "null" && folderId !== "undefined") {
+        query.parentId = folderId;
     } else {
-        console.log("🏠 ENTRANDO A MODO LOCAL");
-        
-        // TRAER MIS ITEMS + COMPARTIDOS
+        // Raíz: Items sin padre
+        query.$or = [ { parentId: null }, { parentId: { $exists: false } } ];
+    }
+
+    let items = [];
+
+    // 4. EJECUTAR CONSULTA ÚNICA
+    // Si es MI escritorio raíz, traigo mis items + los que me compartieron
+    if (!esModoRemoto && (!folderId || folderId === "null" || folderId === "undefined")) {
         items = await Item.find({
             $or: [
-                { userId: miId, $or: [{ parentId: null }, { parentId: { $exists: false } }] },
-                { "sharedWith.userId": miId }
+                query, // Mis items raíz
+                { "sharedWith.userId": miId } // Items que OTROS compartieron CONMIGO (archivos sueltos)
             ]
         }).lean();
+    } else {
+        // Si es remoto O estoy dentro de una carpeta, traigo solo lo que cumple la query estricta
+        items = await Item.find(query).lean();
+    }
 
-        // Aplicar posiciones personalizadas (solo en local)
+    console.log(`✅ Ítems encontrados: ${items.length}`);
+
+    // 5. AJUSTE DE POSICIONES (Si tienes lógica de guestPositions)
+    // (Opcional: Si quieres mantener posiciones personalizadas para invitados)
+    if (items.length > 0) {
         items = items.map(item => {
+            // Si el ítem tiene posiciones de invitados guardadas y yo soy un invitado...
             if (String(item.userId) !== String(miId) && item.guestPositions) {
                 const myPos = item.guestPositions.find(gp => String(gp.userId) === String(miId));
                 if (myPos) {
@@ -279,11 +312,21 @@ const getDesktop = async (req, res) => {
         });
     }
 
-    return res.status(200).json({ ok: true, items });
+
+
+    // Obtenemos las preferencias del DUEÑO del escritorio (targetUserId)
+    const ownerSettings = await Estudiante.findById(targetUserId).select('preferences');
+
+    return res.status(200).json({ 
+        ok: true, 
+        items,
+        preferences: ownerSettings?.preferences // 👈 Enviamos esto al frontend
+    });
+
 
   } catch (error) {
-    console.error("❌ Error CRÍTICO en getDesktop:", error);
-    return res.status(500).json({ ok: false, msg: `Error - ${error.message}` });
+    console.error("❌ Error en getDesktop:", error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
@@ -294,10 +337,11 @@ const getDesktop = async (req, res) => {
 const createItem = async (req, res) => {
   try {
     const userId = req.estudianteHeader._id;
-    const { type, name, url, parentId, x, y } = req.body;
+    const { type, name, url, parentId, x, y, workspaceId } = req.body;
 
     console.log("👉 createItem userId:", userId);
     console.log("👉 createItem body:", req.body);
+    console.log("📂 Parent ID recibido:", parentId);
 
     if (!type || !name)
       return res.status(400).json({ ok: false, msg: "Tipo y nombre son obligatorios" });
@@ -310,8 +354,9 @@ const createItem = async (req, res) => {
       type,
       name,
       url: url || null,
-      parentId: parentId || null,
-      position: { x: x ?? 100, y: y ?? 100 }
+      parentId: (parentId && parentId !== "null") ? parentId : null,
+      position: { x: x ?? 100, y: y ?? 100 },
+      workspaceId: (workspaceId && workspaceId !== "null") ? workspaceId : null
     });
 
     await newItem.save();
@@ -319,6 +364,15 @@ const createItem = async (req, res) => {
     // ✅ SOCKET.IO EVENT
     const io = req.app.get("io");
     if (io) {
+
+      if (workspaceId) {
+          // Si es workspace, avisar a la sala del workspace
+          io.to(`workspace:${workspaceId}`).emit("item-created", newItem);
+      } else {
+          // Si es personal, avisar al usuario
+          io.to(`user:${userId}`).emit("item-created", newItem);
+      }
+
       io.to(`user:${userId}`).emit("item-created", newItem);
 
       // Si este item tiene compartidos (en el futuro)
@@ -720,23 +774,48 @@ const crearPago = async (req, res) => {
 
 
 // A. FUNCIÓN PARA COMPARTIR MI ESCRITORIO (Dar permiso)
+// src/controllers/estudiante-controller.js
+
+// ...
+
 const compartirEscritorio = async (req, res) => {
     try {
-        const ownerId = req.estudianteHeader._id; // Yo
-        const { email } = req.body; // A quién invito
+        const ownerId = req.estudianteHeader._id; // TU ID (El que comparte)
+        const { email } = req.body; // El correo de a QUIÉN invitas
 
+        if (!email) return res.status(400).json({ msg: "Debes ingresar un correo." });
+
+        // 1. Buscar al usuario invitado
         const invitado = await Estudiante.findOne({ email });
-        if (!invitado) return res.status(404).json({ msg: "Usuario no encontrado" });
+        if (!invitado) return res.status(404).json({ msg: "Usuario no encontrado con ese correo." });
 
-        // Evitar duplicados
-        if (!invitado.escritoriosGuardados.includes(ownerId)) {
-            invitado.escritoriosGuardados.push(ownerId);
-            await invitado.save();
+        // 2. Evitar compartir contigo mismo
+        if (String(invitado._id) === String(ownerId)) {
+            return res.status(400).json({ msg: "No puedes compartir el escritorio contigo mismo." });
         }
 
-        return res.status(200).json({ ok: true, msg: `Escritorio compartido con ${email}` });
+        // 3. Verificar si YA tiene acceso (Evitar duplicados)
+        if (invitado.escritoriosGuardados.includes(ownerId)) {
+            return res.status(200).json({ 
+                ok: true, 
+                msg: "El usuario ya tiene acceso a tu escritorio." // Mensaje amigable
+            });
+        }
+
+        // 4. Guardar TU ID en SU lista
+        invitado.escritoriosGuardados.push(ownerId);
+        await invitado.save();
+
+        // Opcional: Podrías enviar un email aquí avisándole
+        
+        return res.status(200).json({ 
+            ok: true, 
+            msg: `Acceso concedido a ${invitado.nombre} ${invitado.apellido}` 
+        });
+
     } catch (error) {
-        return res.status(500).json({ msg: error.message });
+        console.error(error);
+        return res.status(500).json({ msg: "Error al compartir escritorio" });
     }
 };
 
@@ -745,15 +824,26 @@ const getDashboardData = async (req, res) => {
     try {
         const userId = req.estudianteHeader._id;
         
-        // Buscamos al usuario y "populamos" la lista de escritorios guardados
-        // para obtener sus nombres y emails.
+        // 1. Datos del Usuario y sus escritorios guardados (Espejo)
         const usuario = await Estudiante.findById(userId)
-            .populate('escritoriosGuardados', 'nombre email') 
+            .populate('escritoriosGuardados', 'nombre apellido email')
             .select('-password -token -confirmMail');
 
-        return res.status(200).json({ ok: true, usuario });
+        if (!usuario) return res.status(404).json({ msg: "Usuario no encontrado" });
+
+        // 2. 👇 NUEVO: Buscar Workspaces donde soy miembro 👇
+        const workspaces = await Workspace.find({ 
+            miembros: userId 
+        }).select('nombre dueño miembros createdAt');
+
+        return res.status(200).json({ 
+            ok: true, 
+            usuario,     // Datos personales + Accesos Remotos
+            workspaces   // 👇 Nueva lista de Salas Comunes
+        });
     } catch (error) {
-        return res.status(500).json({ msg: error.message });
+        console.error(error);
+        return res.status(500).json({ msg: "Error al obtener datos del dashboard" });
     }
 };
 
@@ -765,6 +855,102 @@ const getItemById = async (req, res) => {
         return res.status(200).json({ ok: true, item });
     } catch (error) {
         return res.status(500).json({ ok: false, msg: error.message });
+    }
+};
+
+const actualizarPosicionesMasivas = async (req, res) => {
+    try {
+        const userId = req.estudianteHeader._id;
+        const { items } = req.body; // Esperamos un array: [{ id: "...", x: 10, y: 20 }, ...]
+
+        if (!items || !Array.isArray(items)) {
+            return res.status(400).json({ ok: false, msg: "Formato de datos incorrecto" });
+        }
+
+        // Usamos bulkWrite para optimizar (una sola operación en DB en lugar de muchas)
+        const operaciones = items.map(item => ({
+            updateOne: {
+                filter: { _id: item.id, userId }, // Solo actualiza si pertenece al usuario
+                update: { $set: { "position.x": item.x, "position.y": item.y } }
+            }
+        }));
+
+        if (operaciones.length > 0) {
+            await Item.bulkWrite(operaciones);
+        }
+
+        return res.status(200).json({ ok: true, msg: "Escritorio organizado guardado" });
+
+    } catch (error) {
+        console.error("❌ Error guardado masivo:", error);
+        return res.status(500).json({ ok: false, msg: error.message });
+    }
+};
+
+const createWorkspace = async (req, res) => {
+    try {
+        const userId = req.estudianteHeader._id;
+        const { nombre } = req.body;
+
+        if (!nombre) return res.status(400).json({ ok: false, msg: "El nombre es obligatorio" });
+
+        const nuevoWorkspace = new Workspace({
+            nombre,
+            dueño: userId,
+            miembros: [userId] // El creador es el primer miembro
+        });
+
+        await nuevoWorkspace.save();
+
+        return res.status(201).json({ 
+            ok: true, 
+            msg: "Espacio de trabajo creado", 
+            workspace: nuevoWorkspace 
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: "Error al crear workspace" });
+    }
+};
+
+const agregarMiembroWorkspace = async (req, res) => {
+    try {
+        const { workspaceId, email } = req.body;
+
+        if (!workspaceId || !email) {
+            return res.status(400).json({ ok: false, msg: "Faltan datos" });
+        }
+
+        // 1. Buscar el usuario a invitar
+        const usuarioInvitado = await Estudiante.findOne({ email });
+        if (!usuarioInvitado) {
+            return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
+        }
+
+        // 2. Buscar el workspace
+        const workspace = await Workspace.findById(workspaceId);
+        if (!workspace) {
+            return res.status(404).json({ ok: false, msg: "Workspace no encontrado" });
+        }
+
+        // 3. Verificar si ya es miembro
+        if (workspace.miembros.includes(usuarioInvitado._id)) {
+            return res.status(400).json({ ok: false, msg: "El usuario ya es miembro" });
+        }
+
+        // 4. Agregar y guardar
+        workspace.miembros.push(usuarioInvitado._id);
+        await workspace.save();
+
+        return res.status(200).json({ 
+            ok: true, 
+            msg: `Se añadió a ${usuarioInvitado.nombre} al equipo.` 
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: "Error al invitar miembro" });
     }
 };
 
@@ -792,7 +978,10 @@ export {
     compartirEscritorio,
     getDashboardData,
     crearPago,
-    getItemById
+    getItemById,
+    actualizarPosicionesMasivas,
+    createWorkspace,
+    agregarMiembroWorkspace
 }
 
 

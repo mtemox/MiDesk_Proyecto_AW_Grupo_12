@@ -10,6 +10,8 @@ const itemSchema = new Schema(
       required: true,
     },
 
+    workspaceId: { type: Schema.Types.ObjectId, ref: 'Workspace', default: null },
+
     // Tipo de ítem: carpeta, nota, código, enlace
     type: {
       type: String,

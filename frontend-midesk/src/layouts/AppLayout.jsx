@@ -33,7 +33,10 @@ function AppLayout() {
     // C. Alguien movió una ventana
     socket.on('window-move', ({ windowId, position }) => {
       setOpenWindows(prev => prev.map(win => 
-        win.id === windowId ? { ...win, defaultX: position.x, defaultY: position.y } : win
+        // 👇 CAMBIO AQUÍ: Usamos String() para asegurar que comparamos texto con texto
+        String(win.id) === String(windowId) 
+            ? { ...win, defaultX: position.x, defaultY: position.y } 
+            : win
       ));
     });
 
@@ -75,13 +78,18 @@ function AppLayout() {
 
     // 2. EMITIR al Socket
     if (socket) {
+
+        const params = new URLSearchParams(window.location.search);
+        const remoteId = params.get('remote');
+
         const user = JSON.parse(localStorage.getItem('user'));
         // Si estoy viendo a otro, le mando el evento a ÉL.
         const targetId = remoteUserId || user.id; 
 
         socket.emit('window-open', { 
-            userId: targetId, // <--- CAMBIO AQUÍ
-            windowData: newWindowObj 
+            userId: targetId, 
+            windowData: newWindowObj,
+            windowId: newWindowId // 👈 ¡AQUÍ ESTABA EL ERROR! Antes decía 'windowId'
         });
      }
   };
@@ -100,16 +108,27 @@ function AppLayout() {
 
   // Necesitamos pasar esta función al Desktop para que Rnd la use al terminar de arrastrar
   const handleDragStop = (windowId, x, y) => {
-    // Actualizamos localmente (opcional, Rnd lo hace visualmente, pero actualizamos estado)
+    // 1. Actualizamos localmente
     setOpenWindows(prev => prev.map(win => 
       win.id === windowId ? { ...win, defaultX: x, defaultY: y } : win
     ));
 
-    // EMITIR movimiento
+    // 2. EMITIR movimiento (CORRECCIÓN SALA REMOTA)
     if (socket) {
       const user = JSON.parse(localStorage.getItem('user'));
-      const targetId = remoteUserId || user.id;
-      socket.emit('window-move', { userId: targetId, windowId, position: { x, y } });
+      
+      // Obtenemos el ID remoto de la URL
+      const params = new URLSearchParams(window.location.search);
+      const remoteId = params.get('remote');
+      
+      // Enviamos a la sala correcta
+      const targetId = remoteId || user.id;
+
+      socket.emit('window-move', { 
+          userId: targetId, 
+          windowId, 
+          position: { x, y } 
+      });
     }
   }
 
@@ -155,6 +174,7 @@ function AppLayout() {
           onOpenApp={handleOpenWindow}
           onMinimize={handleMinimizeWindow} // Para restaurar/minimizar desde la barra
           onFocus={handleFocusWindow}       // Para traer al frente
+          
       />
     </main>
   );

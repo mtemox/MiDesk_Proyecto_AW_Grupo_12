@@ -2,7 +2,7 @@ import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
 moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,crearPago,  
 compartirEscritorio,
-getDashboardData, getItemById} from '../controllers/estudiante-controller.js';
+getDashboardData, getItemById, actualizarPosicionesMasivas, createWorkspace, agregarMiembroWorkspace} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT, crearTokenJWT } from '../middlewares/JWT.js';
 
 import { improveTextIA, chatWithMiDesk, generateWallpaperIA } from "../controllers/ai-controller.js";
@@ -63,6 +63,10 @@ router.get("/desktop", verificarTokenJWT, getDesktop);
 // Por Id
 router.get('/items/:id', verificarTokenJWT, getItemById);
 
+// Masivos
+
+router.patch('/items/positions/bulk', verificarTokenJWT, actualizarPosicionesMasivas);
+
 // Crear un nuevo ítem
 router.post("/items", verificarTokenJWT, createItem);
 
@@ -98,5 +102,11 @@ router.post('/ia/chat', verificarTokenJWT, chatWithMiDesk);
 // Wallpapers con ia hugging face
 
 router.post('/ia/generate-wallpaper', verificarTokenJWT, generateWallpaperIA);
+
+// Workspaces
+
+router.post("/workspaces", verificarTokenJWT, createWorkspace);
+
+router.post("/workspaces/invite", verificarTokenJWT, agregarMiembroWorkspace);
 
 export default router;

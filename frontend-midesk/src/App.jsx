@@ -12,26 +12,16 @@ import Reset from './pages/Reset';
 import Dashboard from './pages/Dashboard';
 
 function App() {
+
   return (
     <Routes>
-      
-      {/* --- 2. RUTA PRINCIPAL (LANDING) --- */}
-      {/* Antes, tu ruta principal o el wildcard
-        probablemente redirigían a '/login'.
-        Ahora, la ruta "/" (la raíz) muestra tu LandingPage.
-      */}
-      <Route path="/" element={<LandingPage />} /> {/* <-- ¡MODIFICADO! */}
-
-      {/* Rutas de Autenticación */}
+      <Route path="/" element={<LandingPage />} /> 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-
       <Route path="/confirmar/:token" element={<Confirm />} />
       <Route path="/forgot" element={<Forgot />} />
-      
       <Route path="/reset/:token" element={<Reset />} />
       
-      {/* Ruta Dashboard */}
       <Route 
         path="/dashboard" 
         element={
@@ -41,7 +31,6 @@ function App() {
         } 
       />
 
-      {/* Ruta principal de la App (Protegida) */}
       <Route 
         path="/desktop" 
         element={
@@ -51,12 +40,7 @@ function App() {
         } 
       />
       
-      {/* --- 3. REDIRECCIÓN (WILDCARD) --- */}
-      {/* Ahora, cualquier ruta desconocida (ej. /hola, /pagina-rota)
-        redirigirá a la LandingPage ('/'), no al login.
-      */}
-      <Route path="*" element={<Navigate to="/" />} /> {/* <-- ¡MODIFICADO! */}
-
+      <Route path="*" element={<Navigate to="/" />} /> 
     </Routes>
   );
 }

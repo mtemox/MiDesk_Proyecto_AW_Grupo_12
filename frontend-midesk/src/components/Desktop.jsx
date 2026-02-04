@@ -6,6 +6,7 @@ import { useFetch } from '../hooks/useFetch';
 import { useSocket } from '../context/SocketContext';
 import { useSearchParams } from 'react-router-dom';
 import ShareForm from './ShareForm';
+import { useTheme } from '../context/ThemeContext';
 
 // Componentes UI
 import AppWindow from './AppWindow';
@@ -80,7 +81,9 @@ const getIconImage = (type) => {
 
 
 function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMinimizeWindow, onMaximizeWindow, onDragStop }) {
-  
+  // Theme
+  const { setSpecificTheme } = useTheme();
+
   // PASO 2: Crear el estado para los íconos
   const [icons, setIcons] = useState([])
 
@@ -89,6 +92,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
   // Socket
   const { socket } = useSocket();
   const [searchParams] = useSearchParams();
+  const workspaceId = searchParams.get('workspace');
   const remoteId = searchParams.get('remote');
 
   // DETECTAR MODO REMOTO
@@ -121,88 +125,123 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
   // --- FUNCIÓN PARA CALCULAR POSICIONES SEGÚN RESOLUCIÓN ---
   const calculateSystemPositions = () => {
-  const marginX = 10; // Más pegado a la izquierda
-  const marginY = 10; // Más pegado arriba
-  const iconWidth = 90; // Ancho del icono (74) + pequeño espacio
-  const iconHeight = 100; // Alto del icono (88) + pequeño espacio
-  const taskbarHeight = 55; // Espacio de seguridad para tu taskbar
-  
-  const availableHeight = window.innerHeight - taskbarHeight - marginY;
+    const MARGIN_X = 10; 
+    const MARGIN_Y = 10;
+    // ÚNIFICAMOS MEDIDAS CON EL EFECTO DE AUTO-ARRANGE
+    const CELL_WIDTH = 90; 
+    const CELL_HEIGHT = 100; 
+    const TASKBAR_HEIGHT = 55; // Ajustado a 60 para coincidir
+    
+    const availableHeight = window.innerHeight - TASKBAR_HEIGHT - MARGIN_Y;
+    
+    // Calculamos filas disponibles (Mínimo 1)
+    let maxRows = Math.floor(availableHeight / CELL_HEIGHT);
+    if (maxRows < 1) maxRows = 1;
 
-  return systemAppsBase.map((app, index) => {
-    const iconsPerCol = Math.floor(availableHeight / iconHeight);
-    const col = Math.floor(index / iconsPerCol);
-    const row = index % iconsPerCol;
+    return systemAppsBase.map((app, index) => {
+      // Lógica Vertical (Columna 1 llena, luego Columna 2...)
+      const col = Math.floor(index / maxRows);
+      const row = index % maxRows;
 
-    return {
-      ...app,
-      position: {
-        x: marginX + (col * iconWidth),
-        y: marginY + (row * iconHeight)
-      }
-    };
-  });
-};
+      return {
+        ...app,
+        position: {
+          x: MARGIN_X + (col * CELL_WIDTH),
+          y: MARGIN_Y + (row * CELL_HEIGHT)
+        }
+      };
+    });
+  };
 
   // --- CARGA INICIAL Y REDIMENSIONAMIENTO ---
   useEffect(() => {
-    const loadEverything = async () => {
-      // 1. Calculamos apps de sistema según la resolución actual
-      const positionedSystemApps = calculateSystemPositions();
+  const loadEverything = async () => {
+    setIcons([]);
+    const positionedSystemApps = calculateSystemPositions();
+    
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    
+    const rawRemoteId = searchParams.get('remote'); 
+    const rawFolderId = searchParams.get('folder');
+    const remoteIdParam = (rawRemoteId && rawRemoteId !== "null" && rawRemoteId !== "undefined") 
+                          ? rawRemoteId 
+                          : null;
+    const workspaceIdParam = (rawFolderId && rawFolderId !== "null") ? rawFolderId : null;
+    const workspaceParam = searchParams.get('workspace');
 
-      // 2. Cargar items del usuario desde el Backend
-      const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    try {
+       const params = new URLSearchParams();
+       if (remoteIdParam) params.append('remoteUserId', remoteIdParam);
+       if (workspaceParam) params.append('workspaceId', workspaceParam);
+       
+       const baseUrl = backendUrl.replace(/\/$/, ''); 
+       const finalUrl = `${baseUrl}/desktop?${params.toString()}`;
 
-      try {
-        // Limpiamos espacios o caracteres raros
-         const cleanRemoteId = remoteId ? remoteId.trim() : null;
-         
-         // Construimos la URL con cuidado
-         // Si hay ID remoto, usamos ?remoteUserId=... sino cadena vacía
-         const queryString = cleanRemoteId ? `?remoteUserId=${cleanRemoteId}` : '';
-         
-         // Eliminamos posible doble slash si backendUrl termina en /
-         const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
-         const finalUrl = `${baseUrl}/desktop${queryString}`;
+       const data = await fetchDataBackend(
+          finalUrl, 
+          null, 
+          "GET", 
+          { Authorization: `Bearer ${token}` }
+       );
 
-         console.log("🚀 Enviando petición a:", finalUrl);
+      if (data && data.ok) {
+        const userItems = data.items.map(item => ({
+           _id: item._id,
+           nombre: item.name,
+           imgSrc: getIconImage(item.type),
+           type: item.type,
+           url: item.url,
+           position: item.position || { x: 100, y: 100 }, 
+           content: item.content || ""
+         }));
 
-         const data = await fetchDataBackend(
-            finalUrl, 
-            null, 
-            "GET", 
-            { Authorization: `Bearer ${token}` }
-         );
+        setIcons([...positionedSystemApps, ...userItems]);
 
-        if (data && data.ok) {
-          const userItems = data.items.map(item => ({
-             _id: item._id,
-             nombre: item.name,
-             imgSrc: getIconImage(item.type),
-             type: item.type,
-             url: item.url,
-             position: item.position,
-             content: item.content || ""
-           }));
-
-          // Mezclamos: Apps de sistema calculadas + Items de usuario
-          setIcons([...positionedSystemApps, ...userItems]);
+        // 👇 CARGAR PREFERENCIAS (Tema + Wallpaper)
+        if (data.preferences) {
+            if (data.preferences.theme) {
+                setSpecificTheme(data.preferences.theme);
+            }
+            if (data.preferences.wallpaperUrl) {
+                setCurrentWallpaper(data.preferences.wallpaperUrl);
+            } else {
+                setCurrentWallpaper(defaultWallpaper);
+            }
         }
-      } catch (error) {
-        setIcons(positionedSystemApps); // Si falla el fetch, al menos mostramos sistema
-      }
-    };
 
-    loadEverything();
+      } else {
+          console.warn("⚠️ No se pudieron cargar items remotos:", data?.msg);
+          setIcons(positionedSystemApps);
+      }
+    } catch (error) {
+      console.error("❌ Error carga inicial:", error);
+      setIcons(positionedSystemApps); 
+    }
+  };
+
+  loadEverything();
 
     // --- AQUÍ EMPIEZA LA LÓGICA NUEVA DE WEB SOCKETS ---
     if (socket) {
-
-      if (isRemote) {
-            console.log("🔭 Modo Remoto: Conectando a sala de", remoteUserId);
-            socket.emit('join-user-room', remoteUserId);
-        }
+      const myUser = JSON.parse(localStorage.getItem('user'));
+      
+      // 👇 MODIFICAR ESTE BLOQUE LOGICO 👇
+      if (workspaceId) {
+          // CASO 1: ESPACIO DE TRABAJO
+          console.log(`🔌 Socket: Uniéndose a WORKSPACE room: workspace:${workspaceId}`);
+          socket.emit('join-workspace-room', workspaceId); // Evento especial para workspaces
+      } 
+      else if (isRemote) {
+          // CASO 2: ESCRITORIO REMOTO (Espejo)
+          console.log("🔭 Modo Remoto: Conectando a sala de", remoteUserId);
+          socket.emit('join-user-room', remoteUserId);
+      } 
+      else {
+          // CASO 3: MI ESCRITORIO (Local)
+          console.log(`🔌 Socket: Uniéndose a MI sala: user:${myUser.id}`);
+          socket.emit('join-user-room', myUser.id);
+      }
       
       // A. Escuchar cuando se CREA un ítem (por otro usuario o por mí en otra pestaña)
       socket.on('item-created', (newItem) => {
@@ -275,14 +314,25 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       });
 
       // F. Escuchar cambios de preferencias (Tema/Fondo)
-        socket.on('preferences-updated', (prefs) => {
-            console.log("🎨 Preferencias actualizadas remotamente:", prefs);
-            if (prefs.wallpaperUrl) {
-                setCurrentWallpaper(prefs.wallpaperUrl);
-            }
-            // Si quieres manejar el tema oscuro aquí también:
-            // if (prefs.theme) ...
-        });
+      socket.on('preferences-updated', (prefs) => {
+          console.log("🎨 Preferencias actualizadas:", prefs);
+          
+          // 1. ACTUALIZAR TEMA (Esto fuerza el cambio visual)
+          if (prefs.theme) {
+              setSpecificTheme(prefs.theme);
+          }
+
+          // 2. ACTUALIZAR WALLPAPER (CORREGIDO)
+          // Si viene definido, verificamos si es cadena vacía.
+          // Si es vacía -> Default. Si tiene URL -> Esa URL.
+          if (prefs.wallpaperUrl !== undefined) {
+              const bgToUse = prefs.wallpaperUrl && prefs.wallpaperUrl !== "" 
+                              ? prefs.wallpaperUrl 
+                              : defaultWallpaper; // 👈 Tu import del fondo .jpg
+              
+              setCurrentWallpaper(bgToUse);
+          }
+      });
 
       socket.on('file-change', ({ fileId, content }) => {
         // Buscamos el ícono y le actualizamos su contenido interno
@@ -322,50 +372,63 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
          socket.off('item-renamed');
          socket.off('item-deleted');
          socket.off('item-shared');
+         socket.off('preferences-updated');
          socket.off('file-change');
        }
     };
 
-  }, [socket, remoteUserId]);
+  }, [socket, remoteUserId, searchParams]);
 
   // 2. USE EFFECT PARA CARGAR PREFERENCIAS Y ESCUCHAR CAMBIOS
   useEffect(() => {
-     const token = localStorage.getItem('token');
-     const backendUrl = import.meta.env.VITE_BACKEND_URL;
+   const token = localStorage.getItem('token');
+   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-     // A) Cargar fondo inicial desde perfil
-     const fetchWallpaper = async () => {
-        try {
-            const data = await fetchDataBackend(`${backendUrl}/estudiante/perfil`, null, "GET", { Authorization: `Bearer ${token}` });
-            if (data && data.preferences && data.preferences.wallpaperUrl) {
-                setCurrentWallpaper(data.preferences.wallpaperUrl);
-            }
-        } catch (e) { console.error(e); }
-     };
-     fetchWallpaper();
+   const fetchWallpaper = async () => {
+      try {
+          const data = await fetchDataBackend(`${backendUrl}/estudiante/perfil`, null, "GET", { Authorization: `Bearer ${token}` });
+          if (data && data.preferences && data.preferences.wallpaperUrl) {
+              setCurrentWallpaper(data.preferences.wallpaperUrl);
+          }
+      } catch (e) { console.error(e); }
+   };
+   fetchWallpaper();
 
-     // B) Escuchar evento personalizado desde SettingsApp
-     const handleWallpaperChange = (e) => {
-         if (e.detail) setCurrentWallpaper(e.detail);
-     };
-     window.addEventListener('wallpaper-changed', handleWallpaperChange);
+   const handleWallpaperChange = (e) => {
+       if (e.detail) setCurrentWallpaper(e.detail);
+   };
+   
+   // 👇 NUEVO: Listener para tema
+   const handleThemeChange = (e) => {
+       if (e.detail) {
+           console.log("🎨 Tema actualizado localmente:", e.detail);
+           setSpecificTheme(e.detail);
+       }
+   };
 
-     const handleLocalUpdate = (e) => {
-          const { id, content } = e.detail;
-          console.log("🔄 Actualizando escritorio localmente:", id);
-          
-          setIcons(prev => prev.map(icon => 
-              icon._id === id ? { ...icon, content: content } : icon
-          ));
-      };
+   const handleLocalUpdate = (e) => {
+        const { id, content } = e.detail;
+        setIcons(prev => prev.map(icon => 
+            icon._id === id ? { ...icon, content: content } : icon
+        ));
+    };
 
-      window.addEventListener('local-file-update', handleLocalUpdate);
+    const handleOpenShareEvent = () => {
+       handleOpenShareDesktopModal();
+   };
 
-     return () => {
-         window.removeEventListener('wallpaper-changed', handleWallpaperChange);
-         window.removeEventListener('local-file-update', handleLocalUpdate);
-     };
-  }, []);
+   window.addEventListener('wallpaper-changed', handleWallpaperChange);
+   window.addEventListener('theme-changed', handleThemeChange); // 👈 NUEVO
+   window.addEventListener('local-file-update', handleLocalUpdate);
+   window.addEventListener('open-share-desktop-modal', handleOpenShareEvent);
+
+   return () => {
+       window.removeEventListener('wallpaper-changed', handleWallpaperChange);
+       window.removeEventListener('theme-changed', handleThemeChange); // 👈 NUEVO
+       window.removeEventListener('local-file-update', handleLocalUpdate);
+       window.removeEventListener('open-share-desktop-modal', handleOpenShareEvent);
+   };
+}, []);
 
   // --- NUEVA FUNCIÓN: Persistir movimiento en Backend ---
   const handleMoveIcon = async (id, x, y) => {
@@ -667,7 +730,10 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         return (
           <FolderContent 
             folderId={data?._id} 
-            folderName={data?.nombre} 
+            folderName={data?.nombre}
+            // 👇👇 AGREGAMOS ESTA LÍNEA CLAVE 👇👇
+            onOpenItem={onOpenWindow} 
+            // 👆👆 Esto permite que la carpeta abra nuevas ventanas
           />
         );
 
@@ -853,6 +919,35 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
     }
   };
 
+  // NUEVA FUNCIÓN: Abrir modal para compartir MI escritorio
+  const handleOpenShareDesktopModal = () => {
+      // Cerramos el menú inicio si estuviera abierto (opcional, si tienes acceso al estado)
+      setModalMode('share-desktop'); // Nuevo modo
+      setIsModalVisible(true);
+  };
+
+  // NUEVA FUNCIÓN: Llamar al backend para compartir escritorio
+  const handleShareDesktop = async (formData) => {
+      const token = localStorage.getItem('token');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+      try {
+          const response = await fetchDataBackend(
+              `${backendUrl}/share-desktop`, // Endpoint del backend
+              { email: formData.email },     // Body
+              "POST",
+              { Authorization: `Bearer ${token}` }
+          );
+
+          if (response && response.ok) {
+              toast.success(response.msg || "¡Acceso concedido correctamente!");
+              closeModal();
+          }
+      } catch (error) {
+          console.error("Error compartiendo escritorio:", error);
+      }
+  };
+
   // 3. FUNCIÓN PARA LLAMAR AL BACKEND (POST /share/:id)
   const handleShareItem = async (formData) => {
     const token = localStorage.getItem('token');
@@ -875,6 +970,110 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         console.error("Error al compartir:", error);
     }
   };
+
+  // Para no esconder íconos
+
+  useEffect(() => {
+  // Función auxiliar para guardar en backend sin bloquear la UI
+  const saveLayoutToBackend = async (changedItems) => {
+      if (changedItems.length === 0) return;
+
+      const token = localStorage.getItem('token');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+      try {
+          // Preparamos los datos limpios para el backend
+          const payload = changedItems.map(icon => ({
+              id: icon._id,
+              x: icon.position.x,
+              y: icon.position.y
+          }));
+
+          await fetch(`${backendUrl}/items/positions/bulk`, {
+              method: 'PATCH',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ items: payload })
+          });
+          
+          console.log(`💾 Auto-guardado: ${changedItems.length} íconos actualizados.`);
+      } catch (error) {
+          console.error("Error auto-guardando escritorio:", error);
+      }
+  };
+
+  const autoArrangeIcons = () => {
+    const CELL_W = 90; 
+    const CELL_H = 100; 
+    const MARGIN_X = 10;
+    const MARGIN_Y = 10;
+    const TASKBAR_HEIGHT = 55; 
+
+    const availableHeight = window.innerHeight - TASKBAR_HEIGHT;
+    let maxRows = Math.floor(availableHeight / CELL_H);
+    if (maxRows < 1) maxRows = 1;
+
+    setIcons(prevIcons => {
+      // 1. Ordenamos por columnas visuales (Izquierda a Derecha, luego Arriba a Abajo)
+      // Esto asegura que al hacer Zoom Out, los íconos mantengan su orden relativo
+      const sortedIcons = [...prevIcons].sort((a, b) => {
+        // Tolerancia de columna (la mitad de una celda)
+        if (Math.abs(a.position.x - b.position.x) > (CELL_W / 2)) {
+            return a.position.x - b.position.x;
+        }
+        return a.position.y - b.position.y;
+      });
+
+      const changedIcons = []; // Aquí guardaremos los que se muevan
+
+      // 2. Recalcular
+      const arrangedIcons = sortedIcons.map((icon, index) => {
+        const col = Math.floor(index / maxRows);
+        const row = index % maxRows;
+
+        const newX = MARGIN_X + (col * CELL_W);
+        const newY = MARGIN_Y + (row * CELL_H);
+
+        // Verificamos si cambió la posición
+        // (Usamos un margen de error pequeño de 1px por si acaso)
+        if (Math.abs(icon.position.x - newX) > 1 || Math.abs(icon.position.y - newY) > 1) {
+            const updatedIcon = { ...icon, position: { x: newX, y: newY } };
+            
+            // Solo guardamos si NO es un ícono de sistema (sys-...)
+            // Los de sistema no se guardan en BD, así que no enviamos update
+            if (!icon._id.toString().startsWith('sys-')) {
+                changedIcons.push(updatedIcon);
+            }
+            return updatedIcon;
+        }
+        return icon;
+      });
+
+      // 3. Disparar guardado (Side Effect seguro)
+      if (changedIcons.length > 0) {
+          saveLayoutToBackend(changedIcons);
+      }
+
+      return arrangedIcons;
+    });
+  };
+
+  let resizeTimer;
+  const onResize = () => {
+    clearTimeout(resizeTimer);
+    // Esperamos 500ms después de que dejes de redimensionar para guardar
+    resizeTimer = setTimeout(autoArrangeIcons, 500);
+  };
+
+  // Ejecutar al inicio para alinear todo
+  autoArrangeIcons();
+
+  window.addEventListener('resize', onResize);
+  return () => window.removeEventListener('resize', onResize);
+
+}, []);
 
 
   return (
@@ -934,7 +1133,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         title={
             modalMode === 'folder' ? "Nueva Carpeta" : 
             modalMode === 'link' ? "Nuevo Enlace Web" : 
-            modalMode === 'share' ? "Compartir Elemento" : "" // <--- Título dinámico
+            modalMode === 'share' ? "Compartir Elemento" : // <--- Título dinámico
+            modalMode === 'share-desktop' ? "Dar Acceso a mi PC" : ""
         }
       >
         {modalMode === 'folder' && <NewFolderForm onSubmit={handleCreateItem} />}
@@ -947,6 +1147,15 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
                 itemToShare={menuState.selectedItem} 
             />
         )}
+
+        {/* 👇 NUEVO: Compartir Escritorio 👇 */}
+        {modalMode === 'share-desktop' && (
+            <ShareForm 
+                onSubmit={handleShareDesktop} 
+                isDesktop={true} // Prop para cambiar textos
+            />
+        )}
+
       </Modal>
 
       {/* Ventanas */}
