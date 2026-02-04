@@ -5,6 +5,10 @@ import { Plus, Loader, Info, RefreshCw, ChevronRight, FileText, Folder, Link2, C
 import { useSocket } from '../context/SocketContext';
 import { toast } from 'react-toastify';
 
+// 👇 1. IMPORTAR MODAL Y FORMULARIO
+import Modal from './Modal';
+import NewLinkForm from './NewLinkForm';
+
 // Importar las imágenes
 import codeIcon from '../assets/icons/code.png'; 
 import noteIcon from '../assets/icons/note.png'; 
@@ -37,14 +41,16 @@ const getTypeIcon = (type) => {
 };
 
 const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderName, onOpenItem }) => {
-    // 👇 NUEVO: Estados para navegación de carpetas
     const [folderHistory, setFolderHistory] = useState([{ id: initialFolderId, name: initialFolderName }]);
     const currentFolder = folderHistory[folderHistory.length - 1];
     
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
-    const fileInputRef = useRef(null); // 👈 NUEVO: Ref para input de archivos
+    const fileInputRef = useRef(null);
+    
+    // 👇 2. NUEVOS ESTADOS PARA EL MODAL
+    const [isModalVisible, setIsModalVisible] = useState(false);
     
     const fetchDataBackend = useFetch();
     const { socket } = useSocket();
@@ -72,7 +78,7 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
 
     useEffect(() => { 
         loadFolderContent(); 
-    }, [currentFolder.id]); // 👈 Recarga cuando cambia la carpeta actual
+    }, [currentFolder.id]);
 
     // Sockets
     useEffect(() => {
@@ -90,8 +96,15 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         }
     }, [socket, currentFolder.id]);
 
-    // Crear elementos
+    // 👇 3. MODIFICADA: Abrir Modal si es Link, Prompt si es otro
     const handleCreateInside = async (type) => {
+        
+        // Si es Link, abrimos el modal y terminamos aquí
+        if (type === 'link') {
+            setIsModalVisible(true);
+            return;
+        }
+
         const name = prompt(`Nombre para ${type === 'folder' ? 'la carpeta' : 'el archivo'}:`);
         if (!name) return;
 
@@ -99,9 +112,9 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
             const newItemData = {
                 type,
                 name,
-                parentId: currentFolder.id, // 👈 Usa carpeta actual
+                parentId: currentFolder.id,
                 x: 0, y: 0,
-                url: type === 'link' ? 'https://google.com' : null
+                url: null
             };
 
             await fetchDataBackend(
@@ -116,13 +129,35 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         }
     };
 
-    // 👇 NUEVO: Navegar a subcarpeta
-    const handleOpenSubfolder = (item) => {
-        setFolderHistory(prev => [...prev, { id: item._id, name: item.name }]);
-        setSelectedItem(null); // Limpiar selección
+    // 👇 4. NUEVA FUNCIÓN: Manejar el submit del formulario de enlace
+    const handleCreateLink = async (formData) => {
+        try {
+            const newItemData = {
+                type: 'link',
+                name: formData.name,
+                url: formData.url,
+                parentId: currentFolder.id,
+                x: 0, y: 0
+            };
+
+            await fetchDataBackend(
+                `${backendUrl}/items`,
+                newItemData, "POST", { Authorization: `Bearer ${token}` }
+            );
+            
+            toast.success("Enlace creado correctamente");
+            setIsModalVisible(false); // Cerrar modal
+            loadFolderContent(); // Recargar
+        } catch (error) {
+            console.error(error);
+        }
     };
 
-    // 👇 NUEVO: Volver atrás
+    const handleOpenSubfolder = (item) => {
+        setFolderHistory(prev => [...prev, { id: item._id, name: item.name }]);
+        setSelectedItem(null);
+    };
+
     const handleGoBack = () => {
         if (folderHistory.length > 1) {
             setFolderHistory(prev => prev.slice(0, -1));
@@ -130,15 +165,12 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         }
     };
 
-    // Abrir elementos (MODIFICADO)
     const handleDoubleClick = (item) => {
         if (item.type === 'folder') {
-            // 👇 MODIFICADO: Ya no abre nueva ventana, navega dentro de esta
             handleOpenSubfolder(item);
         } else if (item.type === 'link') {
             window.open(item.url, '_blank');
         } else if (item.type === 'file') {
-            // 👇 NUEVO: Abrir FileViewer en nueva ventana
             onOpenItem('file', item.name, { defaultWidth: 800, defaultHeight: 600 }, item);
         } else {
             const appId = item.type === 'code' ? 'code' : 'note';
@@ -146,26 +178,24 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         }
     };
 
-    // 👇 NUEVO: Función para subir archivo
     const triggerFileUpload = () => {
         if (fileInputRef.current) {
             fileInputRef.current.click();
         }
     };
 
-    // 👇 NUEVO: Manejar selección de archivo
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        e.target.value = null; // Reset para poder subir el mismo archivo de nuevo
+        e.target.value = null;
 
         const toastId = toast.loading(`Subiendo ${file.name}...`);
 
         try {
             const formData = new FormData();
             formData.append('archivo', file);
-            formData.append('parentId', currentFolder.id); // 👈 IMPORTANTE: Carpeta actual
+            formData.append('parentId', currentFolder.id);
             formData.append('x', 0);
             formData.append('y', 0);
 
@@ -186,7 +216,7 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                     isLoading: false, 
                     autoClose: 2000 
                 });
-                loadFolderContent(); // Recargar contenido
+                loadFolderContent();
             } else {
                 throw new Error(data.msg || "Error al subir");
             }
@@ -202,7 +232,6 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         }
     };
 
-    // Formatear fecha
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
@@ -224,7 +253,7 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                 {/* BARRA DE HERRAMIENTAS */}
                 <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10 flex items-center gap-2 transition-colors duration-300">
                     
-                    {/* 👇 NUEVO: Botón Atrás */}
+                    {/* Botón Atrás */}
                     {folderHistory.length > 1 && (
                         <button 
                             onClick={handleGoBack} 
@@ -247,7 +276,6 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                             <span className="hidden sm:inline">Carpeta</span>
                         </button>
                         
-                        {/* 👇 NUEVO: Botón Subir Archivo */}
                         <button 
                             onClick={triggerFileUpload} 
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-300 dark:border-white/20 rounded-lg shadow-sm transition-all hover:shadow"
@@ -274,11 +302,20 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                             <Code2 size={14} className="text-green-500" />
                             <span className="hidden sm:inline">Código</span>
                         </button>
+
+                        <button 
+                            onClick={() => handleCreateInside('link')} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-300 dark:border-white/20 rounded-lg shadow-sm transition-all hover:shadow"
+                            title="Nuevo enlace"
+                        >
+                            <Link2 size={14} className="text-pink-500" />
+                            <span className="hidden sm:inline">Enlace</span>
+                        </button>
+
                     </div>
 
                     <div className="flex-1"></div>
 
-                    {/* Botón de refrescar */}
                     <button 
                         onClick={loadFolderContent} 
                         className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors"
@@ -288,11 +325,10 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                     </button>
                 </div>
 
-                {/* 👇 MODIFICADO: Breadcrumb con navegación */}
+                {/* Breadcrumb */}
                 <div className="px-4 py-2 bg-slate-50 dark:bg-gray-900/50 border-b border-slate-200 dark:border-white/5 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 transition-colors duration-300">
                     <Folder size={14} className="text-amber-500" />
                     
-                    {/* Ruta completa */}
                     <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
                         {folderHistory.map((folder, index) => (
                             <React.Fragment key={folder.id}>
@@ -357,16 +393,10 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                                                 : 'hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'}
                                         `}
                                     >
-                                        {/* Icono del archivo */}
                                         <div className="relative flex-shrink-0">
-                                            <img 
-                                                src={getIconSrc(item.type)} 
-                                                alt="" 
-                                                className="w-6 h-6 object-contain drop-shadow-sm"
-                                            />
+                                            <img src={getIconSrc(item.type)} alt="" className="w-6 h-6 object-contain drop-shadow-sm" />
                                         </div>
                                         
-                                        {/* Nombre del archivo */}
                                         <div className="flex-1 min-w-0">
                                             <p className={`text-sm font-medium truncate ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>
                                                 {item.name}
@@ -378,7 +408,6 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                                             )}
                                         </div>
 
-                                        {/* Tipo (solo en pantallas medianas+) */}
                                         <div className="w-32 text-center hidden md:block">
                                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${
                                                 isSelected 
@@ -398,19 +427,14 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                                             </span>
                                         </div>
 
-                                        {/* Fecha (solo en pantallas grandes) */}
                                         <div className="w-40 text-right hidden lg:block">
                                             <p className={`text-xs ${isSelected ? 'text-white/80' : 'text-slate-500 dark:text-slate-500'}`}>
                                                 {formatDate(item.updatedAt || item.createdAt)}
                                             </p>
                                         </div>
 
-                                        {/* Indicador de carpeta */}
                                         {item.type === 'folder' && (
-                                            <ChevronRight 
-                                                size={16} 
-                                                className={`flex-shrink-0 ${isSelected ? 'text-white' : 'text-slate-400 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`} 
-                                            />
+                                            <ChevronRight size={16} className={`flex-shrink-0 ${isSelected ? 'text-white' : 'text-slate-400 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`} />
                                         )}
                                     </div>
                                 );
@@ -420,11 +444,9 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                 </div>
             </div>
 
-            {/* ========== PANEL DERECHO: DETALLES DEL ARCHIVO ========== */}
+            {/* ========== PANEL DERECHO: DETALLES ========== */}
             {selectedItem ? (
                 <div className="w-80 bg-white dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col shadow-2xl overflow-hidden transition-colors duration-300">
-                    
-                    {/* Header del panel */}
                     <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10 transition-colors duration-300">
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                             <Info size={14} />
@@ -433,15 +455,10 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        {/* Previsualización del icono grande */}
                         <div className="flex flex-col items-center py-8 px-6 bg-gradient-to-b from-slate-50 to-white dark:from-gray-900/50 dark:to-transparent border-b border-slate-200 dark:border-white/10 transition-colors duration-300">
                             <div className="relative mb-4">
                                 <div className="absolute inset-0 bg-blue-500/20 dark:bg-blue-400/10 blur-2xl rounded-full"></div>
-                                <img 
-                                    src={getIconSrc(selectedItem.type)} 
-                                    alt="" 
-                                    className="relative w-24 h-24 object-contain drop-shadow-2xl"
-                                />
+                                <img src={getIconSrc(selectedItem.type)} alt="" className="relative w-24 h-24 object-contain drop-shadow-2xl" />
                             </div>
                             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 text-center break-words w-full px-2 leading-tight">
                                 {selectedItem.name}
@@ -451,78 +468,49 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                             </p>
                         </div>
 
-                        {/* Información general */}
                         <div className="p-6 space-y-6">
-                            
-                            {/* Detalles */}
                             <div>
-                                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">
-                                    Información
-                                </h4>
+                                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">Información</h4>
                                 <div className="space-y-2.5">
                                     <div className="flex items-start justify-between text-xs">
                                         <span className="text-slate-500 dark:text-slate-500 font-medium">Tipo:</span>
-                                        <span className="text-slate-800 dark:text-slate-200 font-medium capitalize">
-                                            {selectedItem.type === 'folder' ? 'Carpeta' : selectedItem.type}
-                                        </span>
+                                        <span className="text-slate-800 dark:text-slate-200 font-medium capitalize">{selectedItem.type === 'folder' ? 'Carpeta' : selectedItem.type}</span>
                                     </div>
-                                    
                                     <div className="flex items-start justify-between text-xs">
                                         <span className="text-slate-500 dark:text-slate-500 font-medium">ID:</span>
-                                        <span className="text-slate-800 dark:text-slate-200 font-mono text-[10px] bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded">
-                                            {selectedItem._id.slice(-8)}
-                                        </span>
+                                        <span className="text-slate-800 dark:text-slate-200 font-mono text-[10px] bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded">{selectedItem._id.slice(-8)}</span>
                                     </div>
-
                                     {selectedItem.createdAt && (
                                         <div className="flex items-start justify-between text-xs">
                                             <span className="text-slate-500 dark:text-slate-500 font-medium">Creado:</span>
-                                            <span className="text-slate-800 dark:text-slate-200 text-right">
-                                                {formatDate(selectedItem.createdAt)}
-                                            </span>
+                                            <span className="text-slate-800 dark:text-slate-200 text-right">{formatDate(selectedItem.createdAt)}</span>
                                         </div>
                                     )}
-
                                     {selectedItem.updatedAt && (
                                         <div className="flex items-start justify-between text-xs">
                                             <span className="text-slate-500 dark:text-slate-500 font-medium">Modificado:</span>
-                                            <span className="text-slate-800 dark:text-slate-200 text-right">
-                                                {formatDate(selectedItem.updatedAt)}
-                                            </span>
+                                            <span className="text-slate-800 dark:text-slate-200 text-right">{formatDate(selectedItem.updatedAt)}</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Vista previa de enlaces */}
                             {selectedItem.type === 'link' && (
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">
-                                        Enlace
-                                    </h4>
-                                    <a 
-                                        href={selectedItem.url} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        className="block p-3 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-700/30 rounded-lg hover:shadow-md transition-shadow group"
-                                    >
+                                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">Enlace</h4>
+                                    <a href={selectedItem.url} target="_blank" rel="noreferrer" className="block p-3 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-700/30 rounded-lg hover:shadow-md transition-shadow group">
                                         <div className="flex items-center gap-2 mb-1.5">
                                             <Link2 size={14} className="text-purple-600 dark:text-purple-400" />
                                             <span className="text-xs font-semibold text-purple-900 dark:text-purple-300">Abrir enlace</span>
                                         </div>
-                                        <p className="text-xs text-purple-700 dark:text-purple-400 truncate group-hover:underline">
-                                            {selectedItem.url}
-                                        </p>
+                                        <p className="text-xs text-purple-700 dark:text-purple-400 truncate group-hover:underline">{selectedItem.url}</p>
                                     </a>
                                 </div>
                             )}
 
-                            {/* Vista previa de contenido (nota/código) */}
                             {(selectedItem.type === 'note' || selectedItem.type === 'code') && (
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">
-                                        Vista Previa
-                                    </h4>
+                                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">Vista Previa</h4>
                                     <div className="relative">
                                         <div className="absolute top-2 right-2 z-10">
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 dark:bg-black/60 backdrop-blur-sm text-white text-[9px] font-mono rounded">
@@ -530,72 +518,42 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                                                 {selectedItem.type.toUpperCase()}
                                             </span>
                                         </div>
-                                        <div className={`
-                                            p-4 rounded-lg border h-64 overflow-y-auto custom-scrollbar
-                                            ${selectedItem.type === 'code' 
-                                                ? 'bg-slate-900 dark:bg-black/40 border-slate-700 dark:border-white/10 font-mono text-green-400 dark:text-green-300' 
-                                                : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'}
-                                            text-xs leading-relaxed
-                                        `}>
-                                            {selectedItem.content 
-                                                ? <pre className="whitespace-pre-wrap">{selectedItem.content.substring(0, 500)}{selectedItem.content.length > 500 ? '...' : ''}</pre>
-                                                : <span className="italic text-slate-400 dark:text-slate-600">Archivo vacío</span>
-                                            }
+                                        <div className={`p-4 rounded-lg border h-64 overflow-y-auto custom-scrollbar ${selectedItem.type === 'code' ? 'bg-slate-900 dark:bg-black/40 border-slate-700 dark:border-white/10 font-mono text-green-400 dark:text-green-300' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'} text-xs leading-relaxed`}>
+                                            {selectedItem.content ? <pre className="whitespace-pre-wrap">{selectedItem.content.substring(0, 500)}{selectedItem.content.length > 500 ? '...' : ''}</pre> : <span className="italic text-slate-400 dark:text-slate-600">Archivo vacío</span>}
                                         </div>
                                     </div>
                                 </div>
                             )}
-
                         </div>
                     </div>
 
-                    {/* Footer con acciones */}
                     <div className="p-4 bg-slate-50 dark:bg-gray-900/50 border-t border-slate-200 dark:border-white/10 transition-colors duration-300">
-                        <button 
-                            onClick={() => handleDoubleClick(selectedItem)}
-                            className="w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2"
-                        >
-                            {selectedItem.type === 'folder' ? (
-                                <>
-                                    <Folder size={16} />
-                                    <span>Abrir carpeta</span>
-                                </>
-                            ) : selectedItem.type === 'link' ? (
-                                <>
-                                    <Link2 size={16} />
-                                    <span>Visitar enlace</span>
-                                </>
-                            ) : (
-                                <>
-                                    <FileText size={16} />
-                                    <span>Abrir archivo</span>
-                                </>
-                            )}
+                        <button onClick={() => handleDoubleClick(selectedItem)} className="w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2">
+                            {selectedItem.type === 'folder' ? <><Folder size={16} /><span>Abrir carpeta</span></> : selectedItem.type === 'link' ? <><Link2 size={16} /><span>Visitar enlace</span></> : <><FileText size={16} /><span>Abrir archivo</span></>}
                         </button>
                     </div>
                 </div>
             ) : (
-                // Estado vacío del panel de detalles
                 <div className="w-80 bg-slate-50 dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 p-8 text-center transition-colors duration-300">
                     <div className="mb-4 p-6 bg-slate-100 dark:bg-white/5 rounded-full">
                         <Info size={40} className="opacity-30" />
                     </div>
-                    <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                        Sin selección
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-600 leading-relaxed max-w-xs">
-                        Selecciona un archivo o carpeta de la lista para ver sus detalles y opciones.
-                    </p>
+                    <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">Sin selección</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-600 leading-relaxed max-w-xs">Selecciona un archivo o carpeta de la lista para ver sus detalles y opciones.</p>
                 </div>
             )}
 
-            {/* 👇 NUEVO: Input oculto para subir archivos */}
-            <input 
-                type="file" 
-                style={{ display: 'none' }} 
-                ref={fileInputRef} 
-                onChange={handleFileSelect} 
-            />
+            <input type="file" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileSelect} />
+            
+            {/* 👇 5. AÑADIR EL MODAL AL FINAL */}
+            <Modal 
+                isVisible={isModalVisible} 
+                onClose={() => setIsModalVisible(false)} 
+                title="Nuevo Enlace"
+            >
+                <NewLinkForm onSubmit={handleCreateLink} />
+            </Modal>
+
         </div>
     );
 };
