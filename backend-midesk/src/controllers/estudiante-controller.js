@@ -7,7 +7,7 @@ import Item from "../models/item.js";
 import Recommendation from "../models/recomendaciones.js"
 import fs from "fs";
 import stripe from "../helpers/stripe.js";
-import {subirImagenCloudinary} from "../helpers/uploadCloudinary.js"
+import {subirArchivoCloudinary} from "../helpers/uploadCloudinary.js"
 import Workspace from "../models/Workspace.js";
 
 const registro = async (req,res)=>{
@@ -729,7 +729,7 @@ const actualizarImagen = async (req, res) => {
     }
 
     // ✅ subir a Cloudinary
-    const { secure_url, public_id } = await subirImagenCloudinary(file.tempFilePath, "VirtualDesk");
+    const { secure_url, public_id } = await subirArchivoCloudinary(file.tempFilePath, "VirtualDesk");
 
     // ✅ guardar en BD (aunque no exista preferences)
     const estudiante = await Estudiante.findByIdAndUpdate(
@@ -954,6 +954,60 @@ const agregarMiembroWorkspace = async (req, res) => {
     }
 };
 
+const uploadFileItem = async (req, res) => {
+    try {
+        const userId = req.estudianteHeader._id;
+        // Obtenemos datos del body (posición, carpeta padre, etc.)
+        const { parentId, x, y, workspaceId } = req.body;
+
+        // 1. Validar si viene un archivo
+        if (!req.files || !req.files.archivo) {
+            return res.status(400).json({ ok: false, msg: "No se ha seleccionado ningún archivo." });
+        }
+
+        const file = req.files.archivo;
+        
+        // 2. Subir a Cloudinary (Admite PDF, DOCX, MP3, etc.)
+        // Usamos tempFilePath gracias a express-fileupload
+        console.log(`📤 Subiendo archivo: ${file.name}`);
+        const cloudData = await subirArchivoCloudinary(file.tempFilePath, "VirtualDesk_Docs");
+
+        // 3. Crear el Ítem en Base de Datos
+        const newItem = new Item({
+            userId,
+            type: "file", // Tipo fijo
+            name: file.name, // Nombre original del archivo
+            url: cloudData.secure_url, // URL que devuelve Cloudinary
+            fileFormat: cloudData.format || file.name.split('.').pop(), // Guardamos el formato
+            publicId: cloudData.public_id, // Para poder borrarlo de Cloudinary luego
+            parentId: (parentId && parentId !== "null") ? parentId : null,
+            position: { x: Number(x) || 100, y: Number(y) || 100 },
+            workspaceId: (workspaceId && workspaceId !== "null") ? workspaceId : null
+        });
+
+        await newItem.save();
+
+        // 4. Notificar vía Socket.io (para que aparezca en tiempo real)
+        const io = req.app.get("io");
+        if (io) {
+            if (workspaceId) {
+                io.to(`workspace:${workspaceId}`).emit("item-created", newItem);
+            } else {
+                io.to(`user:${userId}`).emit("item-created", newItem);
+            }
+        }
+
+        return res.status(201).json({
+            ok: true,
+            msg: "Archivo subido exitosamente",
+            item: newItem
+        });
+
+    } catch (error) {
+        console.error("❌ Error subiendo archivo:", error);
+        return res.status(500).json({ ok: false, msg: "Error al subir el archivo" });
+    }
+};
 
 export {
     registro,
@@ -981,7 +1035,8 @@ export {
     getItemById,
     actualizarPosicionesMasivas,
     createWorkspace,
-    agregarMiembroWorkspace
+    agregarMiembroWorkspace,
+    uploadFileItem
 }
 
 

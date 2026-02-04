@@ -10,6 +10,7 @@ import { Confirm } from './pages/Confirm';
 import Forgot from './pages/Forgot';
 import Reset from './pages/Reset';
 import Dashboard from './pages/Dashboard';
+import GoogleSuccess from './pages/GoogleSuccess';
 
 function App() {
 
@@ -18,6 +19,7 @@ function App() {
       <Route path="/" element={<LandingPage />} /> 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/google-success" element={<GoogleSuccess />} />
       <Route path="/confirmar/:token" element={<Confirm />} />
       <Route path="/forgot" element={<Forgot />} />
       <Route path="/reset/:token" element={<Reset />} />

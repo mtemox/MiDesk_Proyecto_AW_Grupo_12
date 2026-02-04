@@ -2,7 +2,7 @@ import {Router} from 'express'
 import { confirmarMail,recuperarPassword,comprobarTokenPassword,crearNuevoPassword,registro, login,perfil,actualizarPassword,actualizarPerfil,getDesktop,createItem,deleteItem,
 moverItem,renombrarItem,actulizarContenidoTextual,obetenerRecomendaciones,shareItem,actualizarImagen,actuPreferencias,crearPago,  
 compartirEscritorio,
-getDashboardData, getItemById, actualizarPosicionesMasivas, createWorkspace, agregarMiembroWorkspace} from '../controllers/estudiante-controller.js';
+getDashboardData, getItemById, actualizarPosicionesMasivas, createWorkspace, agregarMiembroWorkspace, uploadFileItem} from '../controllers/estudiante-controller.js';
 import { verificarTokenJWT, crearTokenJWT } from '../middlewares/JWT.js';
 
 import { improveTextIA, chatWithMiDesk, generateWallpaperIA } from "../controllers/ai-controller.js";
@@ -88,6 +88,8 @@ router.post("/share/:id", verificarTokenJWT, shareItem);
 router.patch("/user/preferences",verificarTokenJWT,actuPreferencias);
 
 router.post("/upload/image",verificarTokenJWT,actualizarImagen);
+
+router.post("/items/upload", verificarTokenJWT, uploadFileItem);
 
 router.post("/payments/create-intent", verificarTokenJWT, crearPago);
 

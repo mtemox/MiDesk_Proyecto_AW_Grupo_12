@@ -1,6 +1,6 @@
 // src/components/Desktop.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify'; 
 import { useFetch } from '../hooks/useFetch';
 import { useSocket } from '../context/SocketContext';
@@ -17,6 +17,7 @@ import NewLinkForm from './NewLinkForm';
 import FolderContent from './FolderContent';
 import NewFolderForm from './NewFolderForm';
 import ChatWidget from './widgets/ChatWidget';
+import FileViewer from './FileViewer'; // <--- IMPORTAR
 
 // Widgets y Apps
 import CodeEditor from './CodeEditor';
@@ -42,6 +43,9 @@ import computerIcon from '../assets/icons/desktop.png';
 import linkIcon from '../assets/icons/link.png'; 
 import wordIcon from '../assets/icons/doc.png';
 import aiIcon from '../assets/icons/chat.png';
+import StoragePlans from './storage/StoragePlans'; // <--- IMPORTAR EL COMPONENTE NUEVO
+import shopIcon from '../assets/icons/shop.png';   // <--- O usa computerIcon si no tienes este
+import fileIcon from '../assets/icons/file.png';
 
 
 // --- SIMULACIÓN DE DATOS DEL BACKEND ---
@@ -58,6 +62,14 @@ const systemAppsBase = [
     windowOptions: { defaultWidth: 400, defaultHeight: 600 } 
   },
   { _id: 'sys-8', nombre: 'Asistente IA', imgSrc: aiIcon, type: 'app', appId: 'ai-recommendations' },
+  { 
+    _id: 'sys-store', 
+    nombre: 'Tienda Cloud', 
+    imgSrc: shopIcon, // O computerIcon
+    type: 'app', 
+    appId: 'store', // <--- ESTE ID ES IMPORTANTE
+    windowOptions: { defaultWidth: 900, defaultHeight: 600 } 
+  },
   { _id: 'sys-7', nombre: 'Bloc de Notas', imgSrc: noteIcon, type: 'app', appId: 'notepad' },
   
   { _id: 'sys-6', nombre: 'Mi Equipo', imgSrc: computerIcon, type: 'computer' },
@@ -75,12 +87,16 @@ const getIconImage = (type) => {
         case 'link': return linkIcon;
         case 'note': return wordIcon;
         case 'code': return codeIcon;
+        case 'file': return fileIcon;
         default: return linkIcon;
     }
 };
 
 
 function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMinimizeWindow, onMaximizeWindow, onDragStop }) {
+  // Archivos
+  const fileInputRef = useRef(null);
+  
   // Theme
   const { setSpecificTheme } = useTheme();
 
@@ -191,7 +207,9 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
            nombre: item.name,
            imgSrc: getIconImage(item.type),
            type: item.type,
+           appId: item.type === 'file' ? 'file' : item.type,
            url: item.url,
+           fileFormat: item.fileFormat,
            position: item.position || { x: 100, y: 100 }, 
            content: item.content || ""
          }));
@@ -254,6 +272,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             imgSrc: getIconImage(newItem.type),
             type: newItem.type,
             url: newItem.url,
+            fileFormat: newItem.fileFormat,
             position: newItem.position || { x: 100, y: 100 },
             content: newItem.content || ""
         };
@@ -803,6 +822,13 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       case 'ai-chat':
         return <ChatWidget />;
 
+      case 'store':
+        return <StoragePlans />;
+
+      case 'file': 
+        // ✅ AHORA USAMOS EL VISUALIZADOR INTELIGENTE
+        return <FileViewer file={data} />;
+
       default:
         return <div className="text-white p-4">App no encontrada</div>;
       }
@@ -1075,6 +1101,77 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
 }, []);
 
+  // 2. FUNCIÓN QUE ABRE EL SELECTOR DE ARCHIVOS
+  const triggerFileUpload = () => {
+    handleCloseMenu(); // Cierra el menú contextual
+    if (fileInputRef.current) {
+        fileInputRef.current.click(); // Simula clic en el input oculto
+    }
+  };
+
+  // 3. FUNCIÓN QUE SE EJECUTA AL SELECCIONAR UN ARCHIVO
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Reseteamos el input para poder subir el mismo archivo 2 veces seguidas si se quiere
+    e.target.value = null; 
+
+    const toastId = toast.loading(`Subiendo ${file.name}...`);
+    const token = localStorage.getItem('token');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+    // Usamos las coordenadas del último clic derecho
+    const posX = menuState.x > 0 ? menuState.x - 50 : 100;
+    const posY = menuState.y > 0 ? menuState.y - 50 : 100;
+
+    try {
+        const formData = new FormData();
+        formData.append('archivo', file); // 'archivo' debe coincidir con el backend
+        formData.append('x', posX);
+        formData.append('y', posY);
+        // Si tienes soporte para carpetas o workspaces, agrégalos aquí:
+        if (workspaceId) formData.append('workspaceId', workspaceId);
+
+        const response = await fetch(`${backendUrl}/items/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+                // NO poner 'Content-Type': 'multipart/form-data'. 
+                // El navegador lo pone automático con el boundary correcto.
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            toast.update(toastId, { render: "Archivo subido exitosamente", type: "success", isLoading: false, autoClose: 2000 });
+            
+            // Si NO usas sockets para esto, actualiza el estado manualmente:
+            /*
+            const newIconUI = {
+                _id: data.item._id,
+                nombre: data.item.name,
+                imgSrc: getIconImage('file'), // Asegúrate que getIconImage maneje 'file'
+                type: 'file',
+                url: data.item.url,
+                fileFormat: data.item.fileFormat,
+                position: { x: posX, y: posY }
+            };
+            setIcons(prev => [...prev, newIconUI]);
+            */
+           // Si YA usas sockets, el evento 'item-created' lo agregará solo.
+        } else {
+            throw new Error(data.msg || "Error al subir");
+        }
+
+    } catch (error) {
+        console.error(error);
+        toast.update(toastId, { render: "Error al subir archivo", type: "error", isLoading: false, autoClose: 3000 });
+    }
+  };
+
 
   return (
     <div className="w-full h-screen overflow-hidden" onContextMenu={handleContextMenu} onClick={handleCloseMenu}>
@@ -1113,6 +1210,13 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         ))}
       </div>
 
+      <input 
+        type="file" 
+        style={{ display: 'none' }} 
+        ref={fileInputRef} 
+        onChange={handleFileSelect} 
+      />
+
       {/* Menú Contextual y Modales */}
       <ContextMenu 
         isVisible={menuState.isVisible} 
@@ -1125,6 +1229,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         onNewCode={handleCreateQuickCode}
         onDelete={handleDeleteItem}
         onShare={handleOpenShareModal}
+        onUploadFile={triggerFileUpload}
       />
 
       <Modal 

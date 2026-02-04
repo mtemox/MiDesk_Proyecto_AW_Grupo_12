@@ -1,8 +1,8 @@
 // src/components/ContextMenu.jsx
 import React from 'react';
-import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode, Share2 } from 'lucide-react';
+import { Trash2, Link as LinkIcon, FolderPlus, FileText, FileCode, Share2, UploadCloud } from 'lucide-react';
 
-function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, selectedItem, onDelete, onShare }) {
+function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNewCode, onUploadFile, selectedItem, onDelete, onShare }) {
   
   if (!isVisible) return null;
 
@@ -35,6 +35,23 @@ function ContextMenu({ isVisible, x, y, onNewLink, onNewFolder, onNewNote, onNew
         >
            <FolderPlus size={14} /> Nueva Carpeta
         </li>
+
+        {/* Archivo */}
+        
+        {!selectedItem && (
+            <li 
+            className="
+                            flex items-center gap-2 px-4 py-2 text-sm cursor-pointer 
+                            text-slate-700 dark:text-gray-200
+                            hover:bg-blue-500 hover:text-white
+                            dark:hover:bg-blue-600 dark:hover:text-white
+                            transition-colors duration-150
+                        "
+            onClick={onUploadFile} // 👈 Llama a la función
+            >
+            <UploadCloud size={14} /> Subir Archivo
+            </li>
+        )}
 
         {/* Nueva Nota */}
         <li 

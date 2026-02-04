@@ -11,6 +11,7 @@ import noteIcon from '../assets/icons/note.png';
 import folderIcon from '../assets/icons/folder.png';
 import linkIcon from '../assets/icons/link.png'; 
 import unknownIcon from '../assets/icons/doc.png';
+import fileIcon from '../assets/icons/file.png';
 
 // Helper para obtener el icono PNG
 const getIconSrc = (type) => {
@@ -19,6 +20,7 @@ const getIconSrc = (type) => {
         case 'link': return linkIcon;
         case 'note': return noteIcon;
         case 'code': return codeIcon;
+        case 'file': return fileIcon;
         default: return unknownIcon;
     }
 };

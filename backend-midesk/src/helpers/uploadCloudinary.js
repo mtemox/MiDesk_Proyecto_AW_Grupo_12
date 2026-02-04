@@ -11,10 +11,30 @@ cloudinary.config({
 });
 
 // Función para subir imágenes normales (desde archivos temporales)
-const subirImagenCloudinary = async (filePath, folder = "VirtualDesk") => {
-    const { secure_url, public_id } = await cloudinary.uploader.upload(filePath, { folder });
-    await fs.unlink(filePath);
-    return { secure_url, public_id };
+const subirArchivoCloudinary = async (filePath, folder = "VirtualDesk_Files") => {
+    try {
+        const result = await cloudinary.uploader.upload(filePath, { 
+            folder: folder,
+            resource_type: "auto", // 👈 ¡ESTA ES LA CLAVE! Detecta automáticamente el tipo
+            use_filename: true,
+            unique_filename: true
+        });
+
+        // Borramos el archivo temporal del servidor
+        await fs.unlink(filePath);
+        
+        return { 
+            secure_url: result.secure_url, 
+            public_id: result.public_id,
+            format: result.format,      // ej: "pdf", "mp3"
+            resource_type: result.resource_type // "image", "video" (mp3 cae aquí), "raw" (docs)
+        };
+
+    } catch (error) {
+        // Aseguramos borrar el temporal incluso si falla para no llenar el servidor
+        await fs.unlink(filePath).catch(() => {}); 
+        throw error;
+    }
 };
 
 // Función para subir imágenes de ia
@@ -35,4 +55,4 @@ const subirBase64Cloudinary = async (base64, folder = "VirtualDesk_AI") => {
     return secure_url;
 };
 
-export { subirImagenCloudinary, subirBase64Cloudinary };
+export { subirArchivoCloudinary, subirBase64Cloudinary };

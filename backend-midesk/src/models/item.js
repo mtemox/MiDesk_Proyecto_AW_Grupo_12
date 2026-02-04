@@ -15,7 +15,7 @@ const itemSchema = new Schema(
     // Tipo de ítem: carpeta, nota, código, enlace
     type: {
       type: String,
-      enum: ["folder", "note", "code", "link"],
+      enum: ["folder", "note", "code", "link", "file"],
       required: true,
     },
 
@@ -31,6 +31,9 @@ const itemSchema = new Schema(
       type: String,
       default: null,
     },
+
+    fileFormat: { type: String, default: null }, // ej: pdf, docx, mp3
+    publicId: { type: String, default: null },   // ID de Cloudinary por si quieres borrarlo después
 
     content: {
       type: String,

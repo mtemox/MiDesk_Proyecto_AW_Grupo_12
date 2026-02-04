@@ -18,6 +18,14 @@ function Login() {
   const fetchDataBackend = useFetch();
   
   const { register, handleSubmit, formState: { errors } } = useForm();
+
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+  // Función para redirigir a Google
+  const handleGoogleLogin = () => {
+    // Redirige al navegador completo hacia tu backend
+    window.location.href = `${backendUrl}/auth/google`;
+  };
   
   // Función de login
   const onSubmit = async (data) => {
@@ -150,6 +158,23 @@ function Login() {
              </button>
           </div>
         </form>
+
+        <div className="w-full mt-4">
+          <button
+            type="button" // Importante: type="button" para que no envíe el formulario vacío
+            onClick={handleGoogleLogin}
+            className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium py-2 px-4 rounded-sm flex items-center justify-center gap-2 transition-all shadow-lg"
+          >
+            {/* Puedes usar un SVG de Google o un icono simple */}
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.16-7.27c3.2 0 5.22 1.83 5.71 2.3l1.87-1.87C17.91 3.4 15.01 2.22 12.16 2.22C6.71 2.22 2.22 6.71 2.22 12.16c0 5.45 4.49 9.94 9.94 9.94c5.75 0 9.22-3.83 9.22-9.06c0-.62-.05-1.13-.13-1.94z"
+              />
+            </svg>
+            Iniciar con Google
+          </button>
+        </div>
 
         {/* Links de ayuda */}
         <div className="mt-6 flex flex-col items-center space-y-2 text-sm">

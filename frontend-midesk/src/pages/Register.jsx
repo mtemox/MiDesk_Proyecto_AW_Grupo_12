@@ -47,6 +47,11 @@ function Register() {
     }
   };
 
+  const handleGoogleLogin = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    window.location.href = `${backendUrl}/auth/google`;
+  };
+
 const inputClass = "w-full px-3 py-2 mt-1 text-white bg-gray-900 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent placeholder-gray-500";
 
   return (
@@ -124,6 +129,23 @@ const inputClass = "w-full px-3 py-2 mt-1 text-white bg-gray-900 border border-g
             {loading ? 'Registrando...' : 'Registrarse'}
           </button>
         </div>
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full py-2 px-4 font-bold text-white bg-gray-800 border border-gray-600 rounded-md hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.16-7.27c3.2 0 5.22 1.83 5.71 2.3l1.87-1.87C17.91 3.4 15.01 2.22 12.16 2.22C6.71 2.22 2.22 6.71 2.22 12.16c0 5.45 4.49 9.94 9.94 9.94c5.75 0 9.22-3.83 9.22-9.06c0-.62-.05-1.13-.13-1.94z"
+              />
+            </svg>
+            Registrarse con Google
+          </button>
+        </div>
+
       </form>
 
       <p className="text-sm text-center text-gray-400">

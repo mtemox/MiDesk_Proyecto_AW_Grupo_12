@@ -97,7 +97,8 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
 
   // --- CAMBIAR LENGUAJE ---
   const handleLanguageChange = (e) => {
-    setLanguage(e.target.value);
+    const newLang = e.target.value;
+    setLanguage(newLang);
     // Opcional: Emitir cambio de lenguaje también
     if(socket) {
         const user = JSON.parse(localStorage.getItem('user'));
@@ -106,24 +107,24 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1e1e2e] text-white">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-[#1e1e2e] text-slate-900 dark:text-white transition-colors duration-300">
       
       {/* --- BARRA DE HERRAMIENTAS PREMIUM --- */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-b from-[#252536] to-[#1f1f2e] border-b border-white/10 backdrop-blur-xl">
+      <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gradient-to-b dark:from-[#252536] dark:to-[#1f1f2e] bg-gradient-to-b from-slate-100 to-white border-b border-slate-200 dark:border-white/10 backdrop-blur-xl transition-colors duration-300">
         
         {/* Nombre del Archivo con Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 rounded-lg border border-white/5">
-           <FileCode size={15} className="text-blue-400" strokeWidth={2.5} />
-           <span className="text-xs font-medium text-gray-200 tracking-wide">{fileName || "Sin título"}</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-gray-800/40 rounded-lg border border-slate-200 dark:border-white/5 transition-colors duration-300">
+           <FileCode size={15} className="text-blue-500 dark:text-blue-400" strokeWidth={2.5} />
+           <span className="text-xs font-medium text-slate-700 dark:text-gray-200 tracking-wide">{fileName || "Sin título"}</span>
         </div>
 
         {/* Separador */}
-        <div className="h-6 w-px bg-white/10 mx-1"></div>
+        <div className="h-6 w-px bg-slate-300 dark:bg-white/10 mx-1"></div>
 
         {/* Botón Guardar - Destacado */}
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-lg shadow-blue-500/20 transition-all duration-200 hover:scale-105 font-medium text-sm"
+          className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-lg shadow-blue-500/20 transition-all duration-200 hover:scale-105 font-medium text-sm text-white"
           title="Guardar cambios"
         >
           <Save size={15} strokeWidth={2.5} />
@@ -136,7 +137,7 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
           className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 border
             ${showDiff 
               ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-transparent shadow-lg shadow-purple-500/20 text-white hover:scale-105' 
-              : 'bg-gray-700/30 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+              : 'bg-slate-200 dark:bg-gray-700/30 border-slate-300 dark:border-white/10 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-white/10 hover:border-slate-400 dark:hover:border-white/20'
             }`}
           title={showDiff ? "Volver a Edición" : "Comparar cambios"}
         >
@@ -147,21 +148,21 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
         <div className="flex-1"></div>
 
         {/* Selector de Lenguaje - Diseño Premium */}
-        <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg border border-white/10 hover:border-blue-400/50 transition-colors">
-            <CodeIcon size={14} className="text-gray-400" strokeWidth={2} />
+        <div className="flex items-center gap-2 bg-slate-200 dark:bg-gray-700/30 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/10 hover:border-blue-500 dark:hover:border-blue-400/50 transition-colors duration-200">
+            <CodeIcon size={14} className="text-slate-500 dark:text-gray-400" strokeWidth={2} />
             <select 
                 value={language} 
                 onChange={handleLanguageChange}
-                className="bg-transparent text-gray-200 text-sm font-medium outline-none cursor-pointer hover:text-blue-400 transition-colors"
+                className="bg-transparent text-slate-700 dark:text-gray-200 text-sm font-medium outline-none cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
                 style={{ minWidth: '100px' }}
             >
-                <option value="javascript" className="bg-[#252536]">JavaScript</option>
-                <option value="python" className="bg-[#252536]">Python</option>
-                <option value="html" className="bg-[#252536]">HTML</option>
-                <option value="css" className="bg-[#252536]">CSS</option>
-                <option value="json" className="bg-[#252536]">JSON</option>
-                <option value="cpp" className="bg-[#252536]">C++</option>
-                <option value="java" className="bg-[#252536]">Java</option>
+                <option value="javascript" className="bg-white dark:bg-[#252536]">JavaScript</option>
+                <option value="python" className="bg-white dark:bg-[#252536]">Python</option>
+                <option value="html" className="bg-white dark:bg-[#252536]">HTML</option>
+                <option value="css" className="bg-white dark:bg-[#252536]">CSS</option>
+                <option value="json" className="bg-white dark:bg-[#252536]">JSON</option>
+                <option value="cpp" className="bg-white dark:bg-[#252536]">C++</option>
+                <option value="java" className="bg-white dark:bg-[#252536]">Java</option>
             </select>
         </div>
       </div>
@@ -201,16 +202,16 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
       </div>
 
       {/* Barra de estado inferior - Estilo macOS */}
-      <div className="px-4 py-1.5 bg-gradient-to-b from-[#252536] to-[#1f1f2e] border-t border-white/10 flex justify-between items-center text-[10px] text-gray-400 font-mono backdrop-blur-sm">
+      <div className="px-4 py-1.5 bg-white dark:bg-gradient-to-b dark:from-[#252536] dark:to-[#1f1f2e] bg-gradient-to-b from-slate-100 to-white border-t border-slate-200 dark:border-white/10 flex justify-between items-center text-[10px] text-slate-500 dark:text-gray-400 font-mono backdrop-blur-sm transition-colors duration-300">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${showDiff ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400'}`}></div>
-            {showDiff ? "Comparación Activa" : "Editando"}
+            <div className={`w-1.5 h-1.5 rounded-full ${showDiff ? 'bg-purple-500 dark:bg-purple-400 animate-pulse' : 'bg-emerald-500 dark:bg-emerald-400'}`}></div>
+            <span className="text-slate-600 dark:text-gray-400">{showDiff ? "Comparación Activa" : "Editando"}</span>
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-gray-500">Líneas: <span className="text-blue-400 font-semibold">{code ? code.split('\n').length : 0}</span></span>
-          <span className="text-gray-500">Lenguaje: <span className="text-purple-400 font-semibold">{language.toUpperCase()}</span></span>
+          <span className="text-slate-500 dark:text-gray-500">Líneas: <span className="text-blue-600 dark:text-blue-400 font-semibold">{code ? code.split('\n').length : 0}</span></span>
+          <span className="text-slate-500 dark:text-gray-500">Lenguaje: <span className="text-purple-600 dark:text-purple-400 font-semibold">{language.toUpperCase()}</span></span>
         </div>
       </div>
 
