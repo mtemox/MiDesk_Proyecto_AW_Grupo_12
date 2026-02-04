@@ -1,7 +1,7 @@
 // src/components/FolderContent.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFetch } from '../hooks/useFetch';
-import { Plus, Loader, Info, RefreshCw, ChevronRight, FileText, Folder, Link2, Code2, File } from 'lucide-react';
+import { Plus, Loader, Info, RefreshCw, ChevronRight, FileText, Folder, Link2, Code2, File, UploadCloud, ArrowLeft } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { toast } from 'react-toastify';
 
@@ -36,11 +36,16 @@ const getTypeIcon = (type) => {
     }
 };
 
-const FolderContent = ({ folderId, folderName, onOpenItem }) => {
+const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderName, onOpenItem }) => {
+    // 👇 NUEVO: Estados para navegación de carpetas
+    const [folderHistory, setFolderHistory] = useState([{ id: initialFolderId, name: initialFolderName }]);
+    const currentFolder = folderHistory[folderHistory.length - 1];
+    
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [viewMode, setViewMode] = useState('list'); // 'list' o 'grid'
+    const fileInputRef = useRef(null); // 👈 NUEVO: Ref para input de archivos
+    
     const fetchDataBackend = useFetch();
     const { socket } = useSocket();
     
@@ -52,7 +57,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
         setLoading(true);
         try {
             const data = await fetchDataBackend(
-                `${backendUrl}/desktop?folderId=${folderId}`, 
+                `${backendUrl}/desktop?folderId=${currentFolder.id}`, 
                 null, "GET", { Authorization: `Bearer ${token}` }
             );
             if (data && data.items) {
@@ -65,13 +70,15 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
         }
     };
 
-    useEffect(() => { loadFolderContent(); }, [folderId]);
+    useEffect(() => { 
+        loadFolderContent(); 
+    }, [currentFolder.id]); // 👈 Recarga cuando cambia la carpeta actual
 
     // Sockets
     useEffect(() => {
         if(socket) {
             socket.on('item-created', (newItem) => {
-                if (newItem.parentId === folderId) loadFolderContent();
+                if (newItem.parentId === currentFolder.id) loadFolderContent();
             });
             socket.on('item-deleted', () => loadFolderContent());
         }
@@ -81,7 +88,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                 socket.off('item-deleted');
             }
         }
-    }, [socket, folderId]);
+    }, [socket, currentFolder.id]);
 
     // Crear elementos
     const handleCreateInside = async (type) => {
@@ -92,7 +99,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
             const newItemData = {
                 type,
                 name,
-                parentId: folderId,
+                parentId: currentFolder.id, // 👈 Usa carpeta actual
                 x: 0, y: 0,
                 url: type === 'link' ? 'https://google.com' : null
             };
@@ -109,15 +116,89 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
         }
     };
 
-    // Abrir elementos
+    // 👇 NUEVO: Navegar a subcarpeta
+    const handleOpenSubfolder = (item) => {
+        setFolderHistory(prev => [...prev, { id: item._id, name: item.name }]);
+        setSelectedItem(null); // Limpiar selección
+    };
+
+    // 👇 NUEVO: Volver atrás
+    const handleGoBack = () => {
+        if (folderHistory.length > 1) {
+            setFolderHistory(prev => prev.slice(0, -1));
+            setSelectedItem(null);
+        }
+    };
+
+    // Abrir elementos (MODIFICADO)
     const handleDoubleClick = (item) => {
         if (item.type === 'folder') {
-            onOpenItem('folder', item.name, { defaultWidth: 600, defaultHeight: 400 }, item);
+            // 👇 MODIFICADO: Ya no abre nueva ventana, navega dentro de esta
+            handleOpenSubfolder(item);
         } else if (item.type === 'link') {
             window.open(item.url, '_blank');
+        } else if (item.type === 'file') {
+            // 👇 NUEVO: Abrir FileViewer en nueva ventana
+            onOpenItem('file', item.name, { defaultWidth: 800, defaultHeight: 600 }, item);
         } else {
             const appId = item.type === 'code' ? 'code' : 'note';
             onOpenItem(appId, item.name, {}, item);
+        }
+    };
+
+    // 👇 NUEVO: Función para subir archivo
+    const triggerFileUpload = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+
+    // 👇 NUEVO: Manejar selección de archivo
+    const handleFileSelect = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        e.target.value = null; // Reset para poder subir el mismo archivo de nuevo
+
+        const toastId = toast.loading(`Subiendo ${file.name}...`);
+
+        try {
+            const formData = new FormData();
+            formData.append('archivo', file);
+            formData.append('parentId', currentFolder.id); // 👈 IMPORTANTE: Carpeta actual
+            formData.append('x', 0);
+            formData.append('y', 0);
+
+            const response = await fetch(`${backendUrl}/items/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                toast.update(toastId, { 
+                    render: "Archivo subido exitosamente", 
+                    type: "success", 
+                    isLoading: false, 
+                    autoClose: 2000 
+                });
+                loadFolderContent(); // Recargar contenido
+            } else {
+                throw new Error(data.msg || "Error al subir");
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast.update(toastId, { 
+                render: "Error al subir archivo", 
+                type: "error", 
+                isLoading: false, 
+                autoClose: 3000 
+            });
         }
     };
 
@@ -135,13 +216,25 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
     };
 
     return (
-        <div className="flex h-full w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-[#1a1a2e] dark:to-[#16213e] overflow-hidden font-sans select-none">
+        <div className="flex h-full w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-[#1a1a2e] dark:to-[#16213e] overflow-hidden font-sans select-none transition-colors duration-300">
             
             {/* ========== PANEL IZQUIERDO: EXPLORADOR DE ARCHIVOS ========== */}
             <div className="flex-1 flex flex-col bg-white dark:bg-[#1e1e2e] shadow-xl">
                 
                 {/* BARRA DE HERRAMIENTAS */}
-                <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10 flex items-center gap-2">
+                <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10 flex items-center gap-2 transition-colors duration-300">
+                    
+                    {/* 👇 NUEVO: Botón Atrás */}
+                    {folderHistory.length > 1 && (
+                        <button 
+                            onClick={handleGoBack} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-300 dark:border-white/20 rounded-lg shadow-sm transition-all hover:shadow"
+                            title="Volver atrás"
+                        >
+                            <ArrowLeft size={14} />
+                            <span className="hidden sm:inline">Atrás</span>
+                        </button>
+                    )}
                     
                     {/* Botones de crear */}
                     <div className="flex gap-1.5">
@@ -152,6 +245,16 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                         >
                             <Folder size={14} className="text-amber-500" />
                             <span className="hidden sm:inline">Carpeta</span>
+                        </button>
+                        
+                        {/* 👇 NUEVO: Botón Subir Archivo */}
+                        <button 
+                            onClick={triggerFileUpload} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-300 dark:border-white/20 rounded-lg shadow-sm transition-all hover:shadow"
+                            title="Subir archivo"
+                        >
+                            <UploadCloud size={14} className="text-purple-500" />
+                            <span className="hidden sm:inline">Subir</span>
                         </button>
                         
                         <button 
@@ -185,16 +288,39 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                     </button>
                 </div>
 
-                {/* RUTA DE NAVEGACIÓN (Breadcrumb) */}
-                <div className="px-4 py-2 bg-slate-50 dark:bg-gray-900/50 border-b border-slate-200 dark:border-white/5 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                {/* 👇 MODIFICADO: Breadcrumb con navegación */}
+                <div className="px-4 py-2 bg-slate-50 dark:bg-gray-900/50 border-b border-slate-200 dark:border-white/5 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 transition-colors duration-300">
                     <Folder size={14} className="text-amber-500" />
-                    <span className="font-medium text-slate-800 dark:text-slate-200">{folderName || 'Carpeta'}</span>
+                    
+                    {/* Ruta completa */}
+                    <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
+                        {folderHistory.map((folder, index) => (
+                            <React.Fragment key={folder.id}>
+                                {index > 0 && <ChevronRight size={12} className="text-slate-400 dark:text-slate-600" />}
+                                <button
+                                    onClick={() => {
+                                        if (index < folderHistory.length - 1) {
+                                            setFolderHistory(prev => prev.slice(0, index + 1));
+                                        }
+                                    }}
+                                    className={`font-medium hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
+                                        index === folderHistory.length - 1 
+                                            ? 'text-slate-800 dark:text-slate-200' 
+                                            : 'text-slate-600 dark:text-slate-400'
+                                    }`}
+                                >
+                                    {folder.name}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                    
                     <span className="text-slate-400 dark:text-slate-600">•</span>
                     <span>{items.length} {items.length === 1 ? 'elemento' : 'elementos'}</span>
                 </div>
 
                 {/* ENCABEZADO DE TABLA */}
-                <div className="flex px-4 py-2 bg-slate-100 dark:bg-black/20 border-b border-slate-200 dark:border-white/5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                <div className="flex px-4 py-2 bg-slate-100 dark:bg-black/20 border-b border-slate-200 dark:border-white/5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide transition-colors duration-300">
                     <span className="flex-1">Nombre</span>
                     <span className="w-32 text-center hidden md:block">Tipo</span>
                     <span className="w-40 text-right hidden lg:block">Modificado</span>
@@ -263,7 +389,9 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                                                             ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400'
                                                             : item.type === 'link'
                                                                 ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400'
-                                                                : 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                                                                : item.type === 'file'
+                                                                    ? 'bg-pink-50 dark:bg-pink-500/10 text-pink-700 dark:text-pink-400'
+                                                                    : 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
                                             }`}>
                                                 <TypeIcon size={12} />
                                                 {item.type === 'folder' ? 'Carpeta' : item.type.charAt(0).toUpperCase() + item.type.slice(1)}
@@ -294,10 +422,10 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
 
             {/* ========== PANEL DERECHO: DETALLES DEL ARCHIVO ========== */}
             {selectedItem ? (
-                <div className="w-80 bg-white dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col shadow-2xl overflow-hidden">
+                <div className="w-80 bg-white dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col shadow-2xl overflow-hidden transition-colors duration-300">
                     
                     {/* Header del panel */}
-                    <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10">
+                    <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 border-b border-slate-200 dark:border-white/10 transition-colors duration-300">
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                             <Info size={14} />
                             <span>Detalles</span>
@@ -306,7 +434,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {/* Previsualización del icono grande */}
-                        <div className="flex flex-col items-center py-8 px-6 bg-gradient-to-b from-slate-50 to-white dark:from-gray-900/50 dark:to-transparent border-b border-slate-200 dark:border-white/10">
+                        <div className="flex flex-col items-center py-8 px-6 bg-gradient-to-b from-slate-50 to-white dark:from-gray-900/50 dark:to-transparent border-b border-slate-200 dark:border-white/10 transition-colors duration-300">
                             <div className="relative mb-4">
                                 <div className="absolute inset-0 bg-blue-500/20 dark:bg-blue-400/10 blur-2xl rounded-full"></div>
                                 <img 
@@ -422,7 +550,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                     </div>
 
                     {/* Footer con acciones */}
-                    <div className="p-4 bg-slate-50 dark:bg-gray-900/50 border-t border-slate-200 dark:border-white/10">
+                    <div className="p-4 bg-slate-50 dark:bg-gray-900/50 border-t border-slate-200 dark:border-white/10 transition-colors duration-300">
                         <button 
                             onClick={() => handleDoubleClick(selectedItem)}
                             className="w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2"
@@ -448,7 +576,7 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                 </div>
             ) : (
                 // Estado vacío del panel de detalles
-                <div className="w-80 bg-slate-50 dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 p-8 text-center">
+                <div className="w-80 bg-slate-50 dark:bg-[#1a1a2e] border-l border-slate-200 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 p-8 text-center transition-colors duration-300">
                     <div className="mb-4 p-6 bg-slate-100 dark:bg-white/5 rounded-full">
                         <Info size={40} className="opacity-30" />
                     </div>
@@ -460,6 +588,14 @@ const FolderContent = ({ folderId, folderName, onOpenItem }) => {
                     </p>
                 </div>
             )}
+
+            {/* 👇 NUEVO: Input oculto para subir archivos */}
+            <input 
+                type="file" 
+                style={{ display: 'none' }} 
+                ref={fileInputRef} 
+                onChange={handleFileSelect} 
+            />
         </div>
     );
 };
