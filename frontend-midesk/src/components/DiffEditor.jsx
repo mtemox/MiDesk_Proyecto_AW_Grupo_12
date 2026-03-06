@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
 import { Sun, Moon, Copy, Download, RefreshCw, Columns, Eye } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 import { useTheme } from '../context/ThemeContext';
 
 // Recibe:
@@ -23,13 +23,13 @@ function CodeComparator({ originalCode = '', modifiedCode = '', language = 'java
   // Copiar código modificado
   const handleCopyModified = () => {
     navigator.clipboard.writeText(modifiedCode);
-    toast.success('Código modificado copiado al portapapeles');
+    sileo.success({title: 'Código modificado copiado al portapapeles'});
   };
 
   // Copiar código original
   const handleCopyOriginal = () => {
     navigator.clipboard.writeText(originalCode);
-    toast.success('Código original copiado al portapapeles');
+    sileo.success({title: 'Código original copiado al portapapeles'});
   };
 
   // Descargar comparación
@@ -42,13 +42,13 @@ function CodeComparator({ originalCode = '', modifiedCode = '', language = 'java
     a.download = `${fileName}_comparacion.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Comparación descargada');
+    sileo.success({title: 'Comparación descargada'});
   };
 
   // Cambiar modo de vista
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'split' ? 'inline' : 'split');
-    toast.info(`Modo ${viewMode === 'split' ? 'inline' : 'lado a lado'} activado`);
+    sileo.info({title: `Modo ${viewMode === 'split' ? 'inline' : 'lado a lado'} activado`});
   };
 
   return (

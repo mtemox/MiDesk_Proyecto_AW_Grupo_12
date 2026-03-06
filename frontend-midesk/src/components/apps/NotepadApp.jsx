@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Save, Sparkles, Loader } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 import { useFetch } from '../../hooks/useFetch';
 
 const NotepadApp = ({ fileId, fileName, initialContent = "" }) => {
@@ -11,7 +11,7 @@ const NotepadApp = ({ fileId, fileName, initialContent = "" }) => {
   // --- 1. Lógica para Guardar (SB-B-007) ---
   const handleSave = async () => {
     if (!fileId) {
-      toast.error("Este archivo no se puede guardar (es temporal o de sistema).");
+      sileo.error({title: "Este archivo no se puede guardar (es temporal o de sistema)."});
       return;
     }
 
@@ -35,7 +35,7 @@ const NotepadApp = ({ fileId, fileName, initialContent = "" }) => {
   // --- 2. Lógica para Mejorar con IA (SB-F-008) ---
   const handleImproveWithAI = async () => {
     if (!content.trim()) {
-      toast.warning("Escribe algo antes de pedir ayuda a la IA.");
+      sileo.warning({title: "Escribe algo antes de pedir ayuda a la IA."});
       return;
     }
 
@@ -54,11 +54,11 @@ const NotepadApp = ({ fileId, fileName, initialContent = "" }) => {
 
       if (response && response.ok && response.improvedText) {
         setContent(response.improvedText);
-        toast.success("¡Texto mejorado por IA!");
+        sileo.success({title: "¡Texto mejorado por IA!"});
       }
     } catch (error) {
       console.error("Error IA:", error);
-      toast.error("Error al conectar con la IA.");
+      sileo.error({title: "Error al conectar con la IA."});
     } finally {
       setIsAiLoading(false);
     }

@@ -1,52 +1,48 @@
-// src/hooks/useFetch.js
 import axios from "axios";
-import { toast } from "react-toastify";
+import { sileo } from "sileo";
 
 export function useFetch() {
 
     const fetchDataBackend = async (url, data = null, method = "GET", headers = {}) => {
-        const loadingToast = toast.loading("Procesando solicitud...");
+        
+        const options = {
+            method,
+            url,
+            headers: {
+                ...headers, 
+            },
+        };
+
+        if (data && Object.keys(data).length > 0) {
+            options.headers["Content-Type"] = "application/json";
+            options.data = data;
+        }
+
+        // 1. Creamos la promesa
+        const fetchPromise = new Promise(async (resolve, reject) => {
+            try {
+                const response = await axios(options);
+                resolve(response);
+            } catch (error) {
+                console.error("Error en useFetch:", error);
+                const errorMsg = error.response?.data?.msg || "Error de conexión con el servidor";
+                reject(new Error(errorMsg));
+            }
+        });
+
+        // 2. Le inyectamos Sileo
+        sileo.promise(fetchPromise, {
+            loading: { title: "Procesando solicitud..." },
+            // Extrae el mensaje de respuesta de Axios, si existe.
+            success: (res) => ({ title: res.data?.msg || "Operación exitosa" }),
+            error: (err) => ({ title: err.message })
+        });
 
         try {
-            // 1. Configuración base
-            const options = {
-                method,
-                url,
-                headers: {
-                    ...headers, // Mantenemos headers extra (como Authorization)
-                },
-                
-            };
-
-            // 2. CORRECCIÓN: Solo agregamos Body y Content-Type si hay datos
-            // Esto evita que DELETE o GET fallen por enviar headers vacíos
-            if (data && Object.keys(data).length > 0) {
-                options.headers["Content-Type"] = "application/json";
-                options.data = data;
-            }
-
-            // 3. Hacemos la petición
-            const response = await axios(options);
-
-            toast.dismiss(loadingToast);
-            
-            // A veces el backend no manda 'msg', validamos para que no salga 'undefined'
-            if (response?.data?.msg) {
-                toast.success(response.data.msg);
-            }
-            
+            const response = await fetchPromise;
             return response?.data;
-
         } catch (error) {
-            toast.dismiss(loadingToast);
-            console.error("Error en useFetch:", error);
-            
-            // Manejo seguro del mensaje de error
-            const errorMsg = error.response?.data?.msg || "Error de conexión con el servidor";
-            toast.error(errorMsg);
-            
-            // Lanzamos el error para que el componente sepa que falló
-            throw error; 
+            throw error; // Lanzamos para que los componentes lo atrapen si lo necesitan
         }
     }
     

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
 import { useFetch } from '../../hooks/useFetch';
 import { User, Lock, Save } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 
 const ProfileApp = () => {
   const [activeTab, setActiveTab] = useState('info'); // 'info' o 'security'
@@ -59,7 +59,7 @@ const ProfileApp = () => {
   // Actualizar Contraseña
   const onUpdatePass = async (formData) => {
     if (formData.passwordnuevo !== formData.confirmPassword) {
-      toast.error("Las contraseñas nuevas no coinciden");
+      sileo.error({title: "Las contraseñas nuevas no coinciden"});
       return;
     }
 

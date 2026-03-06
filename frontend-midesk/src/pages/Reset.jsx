@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AuthLayout from './Auth';
 import { useFetch } from '../hooks/useFetch';
 import { useForm } from "react-hook-form";
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 
 function Reset() {
   const { token } = useParams();
@@ -30,7 +30,7 @@ function Reset() {
           setTokenValido(true);
         } else {
             setTokenValido(false);
-            toast.error("El token no es válido o ha expirado.");
+            sileo.error({title: "El token no es válido o ha expirado."});
             setTimeout(() => navigate('/login'), 3000);
         }
       } catch (error) {

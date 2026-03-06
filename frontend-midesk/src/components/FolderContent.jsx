@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useFetch } from '../hooks/useFetch';
 import { Plus, Loader, Info, RefreshCw, ChevronRight, FileText, Folder, Link2, Code2, File, UploadCloud, ArrowLeft } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 
 // 👇 1. IMPORTAR MODAL Y FORMULARIO
 import Modal from './Modal';
@@ -122,7 +122,7 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                 newItemData, "POST", { Authorization: `Bearer ${token}` }
             );
             
-            toast.success("Creado correctamente");
+            sileo.success({title: "Creado correctamente"});
             loadFolderContent(); 
         } catch (error) {
             console.error(error);
@@ -145,7 +145,7 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
                 newItemData, "POST", { Authorization: `Bearer ${token}` }
             );
             
-            toast.success("Enlace creado correctamente");
+            sileo.success({title: "Enlace creado correctamente"});
             setIsModalVisible(false); // Cerrar modal
             loadFolderContent(); // Recargar
         } catch (error) {
@@ -188,47 +188,55 @@ const FolderContent = ({ folderId: initialFolderId, folderName: initialFolderNam
         const file = e.target.files[0];
         if (!file) return;
 
+        // 1. Reseteamos el input para poder subir el mismo archivo después si es necesario
         e.target.value = null;
 
-        const toastId = toast.loading(`Subiendo ${file.name}...`);
+        // 2. Preparamos los datos a enviar
+        const formData = new FormData();
+        formData.append('archivo', file);
+        formData.append('parentId', currentFolder.id);
+        formData.append('x', 0);
+        formData.append('y', 0);
 
-        try {
-            const formData = new FormData();
-            formData.append('archivo', file);
-            formData.append('parentId', currentFolder.id);
-            formData.append('x', 0);
-            formData.append('y', 0);
-
-            const response = await fetch(`${backendUrl}/items/upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                toast.update(toastId, { 
-                    render: "Archivo subido exitosamente", 
-                    type: "success", 
-                    isLoading: false, 
-                    autoClose: 2000 
+        // 3. Envolvemos tu lógica de fetch original en una Promesa pura
+        const uploadPromise = new Promise(async (resolve, reject) => {
+            try {
+                const response = await fetch(`${backendUrl}/items/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
                 });
-                loadFolderContent();
-            } else {
-                throw new Error(data.msg || "Error al subir");
-            }
 
+                const data = await response.json();
+
+                // Si todo sale bien, resolvemos la promesa
+                if (response.ok) {
+                    resolve(data); 
+                } else {
+                    // Si el backend da error, rechazamos enviando el mensaje
+                    reject(new Error(data.msg || "Error al subir"));
+                }
+            } catch (error) {
+                console.error(error);
+                reject(new Error("Error de red al subir archivo"));
+            }
+        });
+
+        // 4. Sileo toma el control visual de la Promesa (Loading -> Success/Error)
+        sileo.promise(uploadPromise, {
+            loading: { title: `Subiendo ${file.name}...` },
+            success: { title: "Archivo subido exitosamente" },
+            error: (err) => ({ title: err.message })
+        });
+
+        // 5. Esperamos que termine para recargar la carpeta (solo si fue exitoso)
+        try {
+            await uploadPromise;
+            loadFolderContent(); 
         } catch (error) {
-            console.error(error);
-            toast.update(toastId, { 
-                render: "Error al subir archivo", 
-                type: "error", 
-                isLoading: false, 
-                autoClose: 3000 
-            });
+            // El error ya lo mostró Sileo en pantalla, no necesitamos hacer más aquí
         }
     };
 

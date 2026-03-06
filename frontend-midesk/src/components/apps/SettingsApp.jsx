@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFetch } from '../../hooks/useFetch';
 import { Monitor, Upload, Check, Moon, Sun, Globe, RefreshCw, Loader, RotateCcw, Sparkles, Image as ImageIcon } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 import ThemeToggle from '../ThemeToggle';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -80,27 +80,27 @@ const SettingsApp = () => {
             window.dispatchEvent(new CustomEvent('wallpaper-changed', { detail: bgToSend }));
             
             if (!isUploading && !isGenerating) {
-                toast.success(updates.wallpaperUrl === "" ? "Fondo restaurado" : "Fondo aplicado");
+                sileo.success({title: updates.wallpaperUrl === "" ? "Fondo restaurado" : "Fondo aplicado"});
             }
         }
 
         // Si actualizamos tema
         if (updates.theme !== undefined) {
-            toast.success(`Tema cambiado a ${updates.theme === 'dark' ? 'oscuro' : 'claro'}`);
+            sileo.success({title: `Tema cambiado a ${updates.theme === 'dark' ? 'oscuro' : 'claro'}`});
         }
 
         return response; // 👈 IMPORTANTE: Retornar respuesta
         
         } catch (error) {
             console.error("Error guardando preferencias:", error);
-            toast.error("Error al guardar preferencias");
+            sileo.error({title: "Error al guardar preferencias"});
             return false;
         }
     };
 
   // 3. LOGICA UNSPLASH (Galería)
   const fetchUnsplashPhotos = async (query = 'nature') => {
-    if (!unsplashKey) { toast.error("Falta API Key Unsplash"); return; }
+    if (!unsplashKey) { sileo.error({title: "Falta API Key Unsplash"}); return; }
     setLoadingUnsplash(true);
     setUnsplashQuery(query);
     try {
@@ -117,32 +117,48 @@ const SettingsApp = () => {
   }, [activeTab]);
 
   // 4. LOGICA SUBIR IMAGEN (Local)
+  // 4. LOGICA SUBIR IMAGEN (Local) con sileo.promise
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setIsUploading(true);
-    const toastId = toast.loading("Subiendo imagen...");
     const formData = new FormData();
     formData.append('image', file);
 
-    try {
-        const response = await fetch(`${backendUrl}/upload/image`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        const data = await response.json();
+    // Creamos la promesa que Sileo va a observar
+    const uploadPromise = new Promise(async (resolve, reject) => {
+        try {
+            const response = await fetch(`${backendUrl}/upload/image`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await response.json();
 
-        if (response.ok) {
-            await savePreferences({ wallpaperUrl: data.wallpaperUrl });
-            toast.update(toastId, { render: "Imagen subida y aplicada", type: "success", isLoading: false, autoClose: 2000 });
-        } else {
-            toast.update(toastId, { render: data.msg || "Error subiendo", type: "error", isLoading: false, autoClose: 3000 });
+            if (response.ok) {
+                await savePreferences({ wallpaperUrl: data.wallpaperUrl });
+                resolve(data);
+            } else {
+                reject(new Error(data.msg || "Error subiendo"));
+            }
+        } catch (error) {
+            console.error(error);
+            reject(new Error("Error de conexión"));
         }
-    } catch (error) {
-        console.error(error);
-        toast.update(toastId, { render: "Error de conexión", type: "error", isLoading: false, autoClose: 3000 });
+    });
+
+    // Se la pasamos a Sileo
+    sileo.promise(uploadPromise, {
+        loading: { title: "Subiendo imagen..." },
+        success: { title: "Imagen subida y aplicada" },
+        error: (err) => ({ title: err.message })
+    });
+
+    try {
+        await uploadPromise;
+    } catch (e) {
+        // El error ya lo renderiza Sileo
     } finally {
         setIsUploading(false);
     }
@@ -150,7 +166,7 @@ const SettingsApp = () => {
 
   // 5. LOGICA GENERAR IA (HuggingFace)
   const handleGenerateAI = async () => {
-    if (!aiPrompt.trim()) return toast.warning("Describe tu imagen primero");
+    if (!aiPrompt.trim()) return sileo.warning({title: "Describe tu imagen primero"});
 
     setIsGenerating(true);
     try {
@@ -163,13 +179,13 @@ const SettingsApp = () => {
 
         if (data && data.ok) {
             await savePreferences({ wallpaperUrl: data.url });
-            toast.success("¡Imagen generada por IA!");
+            sileo.success({title: "¡Imagen generada por IA!"});
             setAiPrompt("");
         }
     } catch (error) {
         console.error(error);
         if (error.response?.status === 503) {
-            toast.info("La IA se está iniciando, intenta en unos segundos.");
+            sileo.info({title: "La IA se está iniciando, intenta en unos segundos."});
         }
     } finally {
         setIsGenerating(false);

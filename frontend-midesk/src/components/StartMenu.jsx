@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, User, Settings, Search, MonitorPlay, Share2 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useFetch } from '../hooks/useFetch';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 
 const StartMenu = ({ isVisible, onClose, onOpenApp }) => {
   const navigate = useNavigate();
@@ -55,7 +55,7 @@ const StartMenu = ({ isVisible, onClose, onOpenApp }) => {
     if (!targetUser.id) return;
     connectToSession(targetUser.id);
     navigate(`/desktop?remote=${targetUser.id}&name=${encodeURIComponent(targetUser.name)}`);
-    toast.success(`Conectado al escritorio de ${targetUser.name}`);
+    sileo.success({title: `Conectado al escritorio de ${targetUser.name}`});
     onClose();
   };
 
@@ -86,9 +86,9 @@ const StartMenu = ({ isVisible, onClose, onOpenApp }) => {
         const data = await response.json();
         
         if(response.ok) {
-            toast.success("¡Acceso concedido!");
+            sileo.success({title: "¡Acceso concedido!"});
         } else {
-            toast.error(data.msg || "Error");
+            sileo.error({title: data.msg || "Error"});
         }
     } catch(e) { console.error(e); }
   };

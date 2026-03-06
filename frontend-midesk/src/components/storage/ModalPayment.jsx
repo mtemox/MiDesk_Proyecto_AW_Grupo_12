@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import storePayments from "../../context/storePayments";
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { CreditCard, Lock, X } from "lucide-react";
-import { toast } from "react-toastify";
 
 function ModalPayment({ plan }) {
 
@@ -44,7 +43,7 @@ function ModalPayment({ plan }) {
 
                 if (error) {
                     console.error(error);
-                    toast.error(error.message);
+                    sileo.error({title: error.message});
                 } else if (paymentIntent.status === "succeeded") {
                     // 3. PAGO EXITOSO
                     // Aquí llamamos a la función del store para cerrar modal y notificar
@@ -55,7 +54,7 @@ function ModalPayment({ plan }) {
 
         } catch (error) {
             console.error("Error en proceso de pago:", error);
-            toast.error("Error procesando el pago.");
+            sileo.error({title: "Error procesando el pago."});
         } finally {
             setLoading(false);
         }

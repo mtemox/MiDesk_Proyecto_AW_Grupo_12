@@ -1,7 +1,7 @@
 // src/components/Desktop.jsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { toast } from 'react-toastify'; 
+import { sileo } from 'sileo';
 import { useFetch } from '../hooks/useFetch';
 import { useSocket } from '../context/SocketContext';
 import { useSearchParams } from 'react-router-dom';
@@ -310,7 +310,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
       // E. Escuchar cuando alguien me comparte algo
       socket.on('item-shared', (sharedItem) => {
         console.log("🎁 ¡Me compartieron algo!", sharedItem);
-        toast.info(`Te han compartido: ${sharedItem.name}`);
+        sileo.info({title: `Te han compartido: ${sharedItem.name}`});
 
         // Lo formateamos para la UI
         const newIconUI = {
@@ -654,7 +654,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             // Actualizamos el estado visualmente
             setIcons(prev => [...prev, newIconUI]);
             closeModal();
-            toast.success("Enlace creado exitosamente");
+            sileo.success({title: "Enlace creado exitosamente"});
         }
     } catch (error) {
         console.error("Error creando ítem:", error);
@@ -701,7 +701,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
             // setIcons(prev => [...prev, newIconUI]);
             closeModal();
-            toast.success(itemType === 'folder' ? "Carpeta creada" : "Enlace creado");
+            sileo.success({title: itemType === 'folder' ? "Carpeta creada" : "Enlace creado"});
         }
     } catch (error) {
         console.error("Error creando ítem:", error);
@@ -715,7 +715,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
 
     // Verificamos si es app del sistema (no se pueden borrar)
     if (item._id.startsWith('sys-')) {
-        toast.error("No puedes eliminar aplicaciones del sistema.");
+        sileo.error({title: "No puedes eliminar aplicaciones del sistema."});
         return;
     }
 
@@ -733,7 +733,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         if (response && response.ok) {
             // Actualizamos el estado local quitando el ítem
             setIcons(prev => prev.filter(icon => icon._id !== item._id));
-            toast.success("Elemento eliminado");
+            sileo.success({title: "Elemento eliminado"});
         }
     } catch (error) {
         console.error("Error eliminando:", error);
@@ -877,7 +877,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             // };
 
             // setIcons(prev => [...prev, newIconUI]);
-            toast.success("Nota creada. Haz clic en el nombre para renombrar.");
+            sileo.success({title: "Nota creada. Haz clic en el nombre para renombrar."});
         }
     } catch (error) {
         console.error("Error creando nota rápida:", error);
@@ -925,7 +925,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
             // };
 
             // setIcons(prev => [...prev, newIconUI]);
-            toast.success("Archivo de código creado.");
+            sileo.success({title: "Archivo de código creado."});
         }
     } catch (error) {
         console.error("Error creando código:", error);
@@ -940,7 +940,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         setModalMode('share'); // Modo Compartir
         setIsModalVisible(true);
     } else {
-        toast.error("No puedes compartir este elemento.");
+        sileo.error({title: "No puedes compartir este elemento."});
         handleCloseMenu();
     }
   };
@@ -966,7 +966,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
           );
 
           if (response && response.ok) {
-              toast.success(response.msg || "¡Acceso concedido correctamente!");
+              sileo.success({title: response.msg || "¡Acceso concedido correctamente!"});
               closeModal();
           }
       } catch (error) {
@@ -989,7 +989,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         );
 
         if (response && response.ok) {
-            toast.success(`Invitación enviada a ${formData.email}`);
+            sileo.success({title: `Invitación enviada a ${formData.email}`});
             closeModal();
         }
     } catch (error) {
@@ -1114,62 +1114,46 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
     const file = e.target.files[0];
     if (!file) return;
 
-    // Reseteamos el input para poder subir el mismo archivo 2 veces seguidas si se quiere
     e.target.value = null; 
 
-    const toastId = toast.loading(`Subiendo ${file.name}...`);
     const token = localStorage.getItem('token');
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
-    // Usamos las coordenadas del último clic derecho
     const posX = menuState.x > 0 ? menuState.x - 50 : 100;
     const posY = menuState.y > 0 ? menuState.y - 50 : 100;
 
-    try {
-        const formData = new FormData();
-        formData.append('archivo', file); // 'archivo' debe coincidir con el backend
-        formData.append('x', posX);
-        formData.append('y', posY);
-        // Si tienes soporte para carpetas o workspaces, agrégalos aquí:
-        if (workspaceId) formData.append('workspaceId', workspaceId);
+    const formData = new FormData();
+    formData.append('archivo', file);
+    formData.append('x', posX);
+    formData.append('y', posY);
+    if (workspaceId) formData.append('workspaceId', workspaceId);
 
-        const response = await fetch(`${backendUrl}/items/upload`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-                // NO poner 'Content-Type': 'multipart/form-data'. 
-                // El navegador lo pone automático con el boundary correcto.
-            },
-            body: formData
-        });
+    const uploadPromise = new Promise(async (resolve, reject) => {
+        try {
+            const response = await fetch(`${backendUrl}/items/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await response.json();
 
-        const data = await response.json();
-
-        if (response.ok) {
-            toast.update(toastId, { render: "Archivo subido exitosamente", type: "success", isLoading: false, autoClose: 2000 });
-            
-            // Si NO usas sockets para esto, actualiza el estado manualmente:
-            /*
-            const newIconUI = {
-                _id: data.item._id,
-                nombre: data.item.name,
-                imgSrc: getIconImage('file'), // Asegúrate que getIconImage maneje 'file'
-                type: 'file',
-                url: data.item.url,
-                fileFormat: data.item.fileFormat,
-                position: { x: posX, y: posY }
-            };
-            setIcons(prev => [...prev, newIconUI]);
-            */
-           // Si YA usas sockets, el evento 'item-created' lo agregará solo.
-        } else {
-            throw new Error(data.msg || "Error al subir");
+            if (response.ok) {
+                resolve(data);
+            } else {
+                reject(new Error(data.msg || "Error al subir"));
+            }
+        } catch (error) {
+            console.error(error);
+            reject(new Error("Error al subir archivo"));
         }
+    });
 
-    } catch (error) {
-        console.error(error);
-        toast.update(toastId, { render: "Error al subir archivo", type: "error", isLoading: false, autoClose: 3000 });
-    }
+    sileo.promise(uploadPromise, {
+        loading: { title: `Subiendo ${file.name}...` },
+        success: { title: "Archivo subido exitosamente" },
+        error: (err) => ({ title: err.message })
+    });
+
+    await uploadPromise.catch(() => {}); // Evita que caiga la app si rechaza, Sileo ya lo muestra
   };
 
 

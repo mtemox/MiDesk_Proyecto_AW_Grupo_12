@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import { Save, Columns, Code as CodeIcon, FileCode } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 import { useFetch } from '../hooks/useFetch';
 import { useSocket } from '../context/SocketContext';
 import { useSearchParams } from 'react-router-dom';
@@ -69,7 +69,7 @@ const CodeEditor = ({ fileId, fileName, initialContent = "" }) => {
   // --- FUNCIÓN GUARDAR ---
   const handleSave = async () => {
     if (!fileId || fileId.toString().startsWith('sys-')) {
-      toast.info("Modo simulación. Crea un archivo real de código para guardar.");
+      sileo.info({title: "Modo simulación. Crea un archivo real de código para guardar."});
       return;
     }
 

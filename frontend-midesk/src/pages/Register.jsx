@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 // import axios from 'axios'; // (Descomentar para la API real)
 import AuthLayout from './Auth'; // La plantilla de estilo
 import { useForm } from "react-hook-form";
-import { ToastContainer } from 'react-toastify';
 import { useFetch } from '../hooks/useFetch';
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000/api';

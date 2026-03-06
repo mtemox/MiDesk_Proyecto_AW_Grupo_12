@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import axios from "axios";
-import { toast } from "react-toastify";
 
 // Helper para obtener headers (Token JWT)
 const getAuthHeaders = () => {
@@ -26,7 +25,7 @@ const storePayments = create((set) => ({
             return respuesta.data; 
         } catch (error) {
             console.error(error);
-            toast.error(error.response?.data?.msg || "Error al iniciar el pago");
+            sileo.error({title: error.response?.data?.msg || "Error al iniciar el pago"});
             return null;
         }
     },
@@ -35,7 +34,7 @@ const storePayments = create((set) => ({
     registerStorageUpdate: async (amount) => {
         // Aquí podrías llamar a otro endpoint para actualizar los GB del usuario
         // si no lo haces automáticamente con Webhooks en el backend.
-        toast.success(`¡Pago exitoso! Se han añadido ${amount}GB a tu cuenta.`);
+        sileo.success({title: `¡Pago exitoso! Se han añadido ${amount}GB a tu cuenta.`});
         set((state) => ({ modal: false })); // Cerramos modal
     }
 }));

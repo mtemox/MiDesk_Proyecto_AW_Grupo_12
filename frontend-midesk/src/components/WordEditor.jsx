@@ -5,7 +5,7 @@ import {
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, 
   List, ListOrdered, Undo, Redo, Download, Type, Palette, Sparkles, Save
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { sileo } from 'sileo';
 import { useFetch } from '../hooks/useFetch';
 import { useSearchParams } from 'react-router-dom';
 
@@ -82,7 +82,7 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
   // --- GUARDAR EN BACKEND ---
   const handleSave = async () => {
     if (!fileId || fileId.toString().startsWith('sys-')) {
-      toast.info("Este es un editor temporal. Crea un archivo real (Clic derecho → Nuevo) para guardar.");
+      sileo.info({title: "Este es un editor temporal. Crea un archivo real (Clic derecho → Nuevo) para guardar."});
       return;
     }
 
@@ -110,7 +110,7 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
     const content = editorRef.current?.innerText || '';
     
     if (!content.trim()) {
-      toast.warning('Escribe algo primero para que la IA pueda mejorarlo.');
+      sileo.warning({title: 'Escribe algo primero para que la IA pueda mejorarlo.'});
       return;
     }
 
@@ -129,7 +129,7 @@ function WordEditor({ fileId, fileName, initialContent = "" }) {
       if (response && response.ok && response.improvedText) {
         if (editorRef.current) {
             editorRef.current.innerText = response.improvedText;
-            toast.success("¡Texto mejorado por IA!");
+            sileo.success({title: "¡Texto mejorado por IA!"});
         }
       }
 
