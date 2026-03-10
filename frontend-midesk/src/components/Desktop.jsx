@@ -29,6 +29,7 @@ import WordEditor from './WordEditor';
 import ProfileApp from './apps/ProfileApp';
 import RecommendationsWidget from './widgets/RecommendationsWidget';
 import SettingsApp from './apps/SettingsApp';
+import CalendarWidget from './widgets/CalendarWidget';
 
 // Imágenes e Íconos
 import codeIcon from '../assets/icons/code.png'; 
@@ -1169,6 +1170,8 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
                 transition: 'background-image 0.5s ease-in-out' // Efecto suave
             }} 
        />
+
+      <CalendarWidget />
 
       {/* BARRA DE AVISO (Solo si es remoto) */}
       {/* BARRA DE AVISO (Solo si es remoto) */}
