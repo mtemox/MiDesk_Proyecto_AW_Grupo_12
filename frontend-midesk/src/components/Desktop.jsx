@@ -30,6 +30,8 @@ import ProfileApp from './apps/ProfileApp';
 import RecommendationsWidget from './widgets/RecommendationsWidget';
 import SettingsApp from './apps/SettingsApp';
 import CalendarWidget from './widgets/CalendarWidget';
+import PostItWidget from './widgets/PostItWidget';
+import WhiteboardApp from './apps/WhiteboardApp';
 
 // Imágenes e Íconos
 import codeIcon from '../assets/icons/code.png'; 
@@ -47,6 +49,7 @@ import aiIcon from '../assets/icons/chat.png';
 import StoragePlans from './storage/StoragePlans'; // <--- IMPORTAR EL COMPONENTE NUEVO
 import shopIcon from '../assets/icons/shop.png';   // <--- O usa computerIcon si no tienes este
 import fileIcon from '../assets/icons/file.png';
+import whiteBoard from '../assets/icons/blackboard.png';
 
 
 // --- SIMULACIÓN DE DATOS DEL BACKEND ---
@@ -54,6 +57,14 @@ import fileIcon from '../assets/icons/file.png';
 // Traemos las imágenes que ya tenías
 
 const systemAppsBase = [
+  { 
+    _id: 'sys-10', // Siguiente ID libre
+    nombre: 'Pizarrón', 
+    imgSrc: whiteBoard, // O un nuevo icono como boardIcon
+    type: 'app', 
+    appId: 'whiteboard', 
+    windowOptions: { defaultWidth: 800, defaultHeight: 600 } // Más grande por defecto
+  },
   { 
     _id: 'sys-9',
     nombre: 'Chat MiDesk', 
@@ -830,6 +841,9 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
         // ✅ AHORA USAMOS EL VISUALIZADOR INTELIGENTE
         return <FileViewer file={data} />;
 
+      case 'whiteboard':
+        return <WhiteboardApp />;
+
       default:
         return <div className="text-white p-4">App no encontrada</div>;
       }
@@ -1172,6 +1186,7 @@ function Desktop({ openWindows, onOpenWindow, onCloseWindow, onFocusWindow, onMi
        />
 
       <CalendarWidget />
+      <PostItWidget />
 
       {/* BARRA DE AVISO (Solo si es remoto) */}
       {/* BARRA DE AVISO (Solo si es remoto) */}
